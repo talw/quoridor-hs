@@ -4,19 +4,18 @@ where
 import qualified Data.Set as S
 import Control.Monad.State
 import Data.List (elemIndex, findIndex, find)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromJust)
 import Control.Applicative ((<$>))
-import Control.Monad (liftM2)
-import Data.Functor.Identity
+import Control.Monad (liftM2, join)
+import qualified Data.Map as M
 
-type Cell = (Char, Int)
+type Cell = (Int, Int) -- y, x
 type Gate = (HalfGate, HalfGate)
 type HalfGate = (Cell, Cell)
 type HalfGates = S.Set HalfGate
 type BoardSize = Int
 
 type Game = State GameState
-{-type Bla m a = StateT GameState m a-}
 
 data Player = Player {
   color :: Color,
@@ -27,7 +26,7 @@ data Player = Player {
 data Turn = PutGate Gate | Move Cell
 
 data Color = Black | White
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data GameState = GameState {
   players :: [Player],
@@ -35,9 +34,29 @@ data GameState = GameState {
   currP :: Player
 } deriving Show
 
+
+
+--- static data
+
+boardSize :: BoardSize
+boardSize = 9
+
+startPos :: M.Map Color Cell
+startPos = M.fromList [(Black, (boardSize - 1,boardSize `div` 2)),
+                       (White, (0, boardSize `div` 2))]
+
+
+
+--- helper functions
+
+lookup' :: Ord k => k -> M.Map k a -> a
+lookup' = (fromJust .) . M.lookup
+
+distance :: Cell -> Cell -> Int
+distance (y,x) (y',x') = abs (y' - y) + abs (x' - x)
+
 isAdj :: Cell -> Cell -> Bool
-isAdj (c,i) (c',i') = fromEnum c - fromEnum c' == abs 1 &&
-                        i - i' == abs 1
+isAdj = ((1 ==) .) . distance
 
 isHalfGateSpaceClear  :: HalfGate -> HalfGates -> Bool
 isHalfGateSpaceClear = (not .) . S.member
@@ -53,7 +72,11 @@ isVacant :: Cell -> [Player] -> Bool
 isVacant c = all ((c /=) . pos)
 
 playerIndex :: Color -> [Player] -> Int
-playerIndex c = fromMaybe (error "playerIndex") . findIndex ((c ==) . color)
+playerIndex c = fromJust . findIndex ((c ==) . color)
+
+
+
+--- Game functions
 
 changeCurrPlayer :: Game ()
 changeCurrPlayer = do
@@ -62,32 +85,38 @@ changeCurrPlayer = do
   let newIndex = playerIndex (color $ currP gs) playerList `mod` length playerList
   modify $ \s -> s {currP = playerList !! newIndex}
 
-changePosition :: Cell -> Game ()
-changePosition c = modify $ \s -> s {currP = (currP s) {pos = c}}
-
 isValidTurn :: Turn -> Game Bool
-isValidTurn (Move c) = do
+isValidTurn (Move c@(cY,cX)) = do
   gs <- get
-  let cp = currP gs
-  let adjacent = isAdj c $ pos cp
-  let noGate = isHalfGateSpaceClear (c, pos cp) $ gates gs
-  let vacant = isVacant c $ players gs
-  return $ adjacent && noGate && vacant
+  let cpp@(cppX, cppY) = pos $ currP gs
+      vacant = isVacant c $ players gs
+      isHGClear = flip isHalfGateSpaceClear $ gates gs
+      valid = case distance c cpp of
+        1 -> isHGClear (c, cpp)
+        2
+          | isStraight c cpp -> let midC = ((cY + cppY) `div` 2, (cX + cppX) `div` 2)
+                                    midNotVacant = not $ isVacant midC $ players gs
+                                    noGate = isHGClear (c, midC)
+                                    noGate2 = isHGClear (midC, cpp)
+                                in  midNotVacant && noGate && noGate2
+          | otherwise -> let isSideHop (y,x) =
+                               let midNotVacant = not $ isVacant (y,x) $ players gs
+                                   gateExist = not $ isHGClear
+                                     ( (y + (y - cppY), x + (x - cppX)),
+                                       (y,x) )
+                                   noGate = isHGClear ((y,x), cpp)
+                               in midNotVacant && noGate && gateExist
+                         in any isSideHop [(cY, cppX),(cppY, cX)]
+        _ -> False
+  return $ valid && vacant
+ where isStraight (y,x) (y',x') = y == y' || x == x'
+
 isValidTurn (PutGate g) = do
   gates' <- gets gates
-  let gateClear = isGateSpaceClear g gates'
   p <- gets currP
-  let haveGates = gatesLeft p > 0
-  return $ gateClear && haveGates
-
-{-putGate :: Gate -> Game Bool-}
-{-putGate g = do-}
-  {-gates' <- gets gates-}
-  {-let noGate = isGateSpaceClear g gates'-}
-  {-p <- gets currP-}
-  {-let haveGates = gatesLeft p > 0-}
-  {-when noGate $ modify $ \s -> s {gates = insertGate g gates'}-}
-  {-return noGate-}
+  let noGate = isGateSpaceClear g gates'
+      haveGates = gatesLeft p > 0
+  return $ noGate && haveGates
 
 actTurn :: Turn -> Game ()
 actTurn (Move c) = modify $ \s -> s {currP = (currP s) {pos = c}}
@@ -96,11 +125,9 @@ actTurn (PutGate g) = modify $ \s -> s {
     currP = (currP s) {gatesLeft = gatesLeft (currP s) - 1}
   }
 
-{-makeMove :: Cell -> Game Bool-}
-{-makeMove dest = do-}
-  {-valid <- isValidMove dest-}
-  {-when valid $ changePosition dest >> changeCurrPlayer-}
-  {-return valid-}
+
+
+--- exported functions
 
 makeTurn :: Turn -> Game Bool
 makeTurn t = do
@@ -108,11 +135,9 @@ makeTurn t = do
   when valid $ actTurn t >> changeCurrPlayer
   return valid
 
-
-isGameOver :: BoardSize -> Game (Maybe Color)
-isGameOver size = do
+isGameOver :: Game (Maybe Color)
+isGameOver = do
   playerList <- gets players
   return $ color <$> find didPlayerWin playerList
- where didPlayerWin (Player c (_,row) _)
-         | c == White = row == 0
-         | c == Black = row == size - 1
+ where didPlayerWin (Player c (currY,_) _) = let (startY,_) = lookup' c startPos
+                                            in currY + startY == boardSize - 1
