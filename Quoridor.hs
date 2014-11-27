@@ -21,7 +21,7 @@ data Player = Player {
   color :: Color,
   pos :: Cell,
   gatesLeft :: Int
-} deriving Show
+} deriving (Show, Eq)
 
 data Turn = PutGate Gate | Move Cell
 
@@ -29,9 +29,8 @@ data Color = Black | White
   deriving (Eq, Show, Ord)
 
 data GameState = GameState {
-  players :: [Player],
-  gates :: HalfGates,
-  currP :: Player
+  playerLoop :: [Player],
+  gates :: HalfGates
 } deriving Show
 
 
@@ -48,6 +47,18 @@ startPos = M.fromList [(Black, (boardSize - 1,boardSize `div` 2)),
 
 
 --- helper functions
+
+modifyCurrP :: (Player -> Player) -> GameState -> GameState
+modifyCurrP f gs = gs {playerLoop = loop (playerList' gs)}
+  where playerList' s = f (currP s) : tail (playerList s)
+        loop list = list ++ loop list
+
+playerList :: GameState -> [Player]
+playerList gs = head pl : takeWhile (head pl /=) (tail pl)
+  where pl = playerLoop gs
+
+currP :: GameState -> Player
+currP = head . playerLoop
 
 lookup' :: Ord k => k -> M.Map k a -> a
 lookup' = (fromJust .) . M.lookup
@@ -79,28 +90,24 @@ playerIndex c = fromJust . findIndex ((c ==) . color)
 --- Game functions
 
 changeCurrPlayer :: Game ()
-changeCurrPlayer = do
-  gs <- get
-  let playerList = players gs
-  let newIndex = playerIndex (color $ currP gs) playerList `mod` length playerList
-  modify $ \s -> s {currP = playerList !! newIndex}
+changeCurrPlayer = modify $ \s -> s {playerLoop = tail $ playerLoop s}
 
 isValidTurn :: Turn -> Game Bool
 isValidTurn (Move c@(cY,cX)) = do
   gs <- get
   let cpp@(cppX, cppY) = pos $ currP gs
-      vacant = isVacant c $ players gs
+      vacant = isVacant c $ playerLoop gs
       isHGClear = flip isHalfGateSpaceClear $ gates gs
       valid = case distance c cpp of
         1 -> isHGClear (c, cpp)
         2
           | isStraight c cpp -> let midC = ((cY + cppY) `div` 2, (cX + cppX) `div` 2)
-                                    midNotVacant = not $ isVacant midC $ players gs
+                                    midNotVacant = not $ isVacant midC $ playerLoop gs
                                     noGate = isHGClear (c, midC)
                                     noGate2 = isHGClear (midC, cpp)
                                 in  midNotVacant && noGate && noGate2
           | otherwise -> let isSideHop (y,x) =
-                               let midNotVacant = not $ isVacant (y,x) $ players gs
+                               let midNotVacant = not $ isVacant (y,x) $ playerLoop gs
                                    gateExist = not $ isHGClear
                                      ( (y + (y - cppY), x + (x - cppX)),
                                        (y,x) )
@@ -119,11 +126,11 @@ isValidTurn (PutGate g) = do
   return $ noGate && haveGates
 
 actTurn :: Turn -> Game ()
-actTurn (Move c) = modify $ \s -> s {currP = (currP s) {pos = c}}
-actTurn (PutGate g) = modify $ \s -> s {
-    gates = insertGate g (gates s),
-    currP = (currP s) {gatesLeft = gatesLeft (currP s) - 1}
-  }
+actTurn (Move c) = modify $ modifyCurrP $ \p -> p {pos = c}
+
+actTurn (PutGate g) = do
+    modify $ \s -> s { gates = insertGate g (gates s) }
+    modify $ modifyCurrP $ \p -> p {gatesLeft = gatesLeft p - 1}
 
 
 
@@ -137,7 +144,7 @@ makeTurn t = do
 
 isGameOver :: Game (Maybe Color)
 isGameOver = do
-  playerList <- gets players
+  playerList <- gets playerLoop
   return $ color <$> find didPlayerWin playerList
  where didPlayerWin (Player c (currY,_) _) = let (startY,_) = lookup' c startPos
                                             in currY + startY == boardSize - 1
