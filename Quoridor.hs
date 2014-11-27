@@ -96,27 +96,31 @@ isValidTurn :: Turn -> Game Bool
 isValidTurn (Move c@(cY,cX)) = do
   gs <- get
   let cpp@(cppX, cppY) = pos $ currP gs
-      vacant = isVacant c $ playerLoop gs
       isHGClear = flip isHalfGateSpaceClear $ gates gs
+      isStraight = cppY == cY || cppX == cX
+      isValidJump
+        | isStraight =
+            let midC = ((cY + cppY) `div` 2, (cX + cppX) `div` 2)
+                midNotVacant = not $ isVacant midC $ playerLoop gs
+                noGate = isHGClear (c, midC)
+                noGate2 = isHGClear (midC, cpp)
+            in  midNotVacant && noGate && noGate2
+        | otherwise =
+            let isSideHop (y,x) =
+                  let midNotVacant = not $ isVacant (y,x) $ playerLoop gs
+                      gateExist = not $ isHGClear
+                        ( (y + (y - cppY), x + (x - cppX)),
+                          (y,x) )
+                      noGate = isHGClear ((y,x), cpp)
+                  in midNotVacant && noGate && gateExist
+            in any isSideHop [(cY, cppX),(cppY, cX)]
+
+      vacant = isVacant c $ playerLoop gs
       valid = case distance c cpp of
         1 -> isHGClear (c, cpp)
-        2
-          | isStraight c cpp -> let midC = ((cY + cppY) `div` 2, (cX + cppX) `div` 2)
-                                    midNotVacant = not $ isVacant midC $ playerLoop gs
-                                    noGate = isHGClear (c, midC)
-                                    noGate2 = isHGClear (midC, cpp)
-                                in  midNotVacant && noGate && noGate2
-          | otherwise -> let isSideHop (y,x) =
-                               let midNotVacant = not $ isVacant (y,x) $ playerLoop gs
-                                   gateExist = not $ isHGClear
-                                     ( (y + (y - cppY), x + (x - cppX)),
-                                       (y,x) )
-                                   noGate = isHGClear ((y,x), cpp)
-                               in midNotVacant && noGate && gateExist
-                         in any isSideHop [(cY, cppX),(cppY, cX)]
+        2 -> isValidJump
         _ -> False
   return $ valid && vacant
- where isStraight (y,x) (y',x') = y == y' || x == x'
 
 isValidTurn (PutGate g) = do
   gates' <- gets gates
