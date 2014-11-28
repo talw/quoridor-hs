@@ -13,14 +13,25 @@ maintainer:          talw10@gmail.com
 category:            Game
 build-type:          Simple
 -- extra-source-files:
-cabal-version:       >=1.10
+cabal-version:       >=1.19
 
 executable quoridor-hs
   main-is:             Quoridor.hs
-  -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.7 && <4.8,
                        containers >=0.5 && <0.6,
-                       mtl >=2.1 && <2.2
+                       mtl >=2.1 && <2.2,
+                       transformers,
+                       HUnit
   -- hs-source-dirs:
   default-language:    Haskell2010
+
+test-suite quoridor-tests
+  build-depends:       base >=4.7 && <4.8,
+                       HUnit,
+                       containers >=0.5 && <0.6,
+                       mtl >=2.1 && <2.2,
+                       transformers
+  default-language:    Haskell2010
+  main-is:             Quoridor_test.hs
+  type:                exitcode-stdio-1.0
