@@ -24,6 +24,7 @@ data Player = Player {
 } deriving (Show, Eq)
 
 data Turn = PutGate Gate | Move Cell
+  deriving (Read, Show)
 
 data Color = Black | White
   deriving (Eq, Show, Ord)
@@ -88,9 +89,12 @@ isAdj :: Cell -> Cell -> Bool
 isAdj = ((1 ==) .) . distance
 
 getAdj :: Cell -> [Cell]
-getAdj c@(y,x) = filter (allT $ (>= 0) `andP` (< boardSize)) adjs
+getAdj c@(y,x) = filter isValidCell adjs
   where adjs = [(y-1,x),(y+1,x),(y,x-1),(y,x+1)]
-        allT pred (a,b) = all pred [a,b]
+
+isValidCell :: Cell -> Bool
+isValidCell = allT $ (>= 0) `andP` (< boardSize)
+  where allT pred (a,b) = all pred [a,b]
 
 isHalfGateSpaceClear  :: HalfGate -> HalfGates -> Bool
 isHalfGateSpaceClear = (not .) . S.member
@@ -98,6 +102,14 @@ isHalfGateSpaceClear = (not .) . S.member
 isGateSpaceClear  :: Gate -> HalfGates -> Bool
 isGateSpaceClear (h1, h2) =
   isHalfGateSpaceClear h1 `andP` isHalfGateSpaceClear h2
+
+gateToCells :: Gate -> [Cell]
+gateToCells ((a,b),(c,d)) = [a,b,c,d]
+
+data Direction = H | V deriving (Show, Read)
+gateUpperLeft :: Cell -> Direction -> Gate
+gateUpperLeft (y,x) H = (((y,x),(y+1,x)),((y,x+1),(y+1,x+1)))
+gateUpperLeft (y,x) V = (((y,x),(y,x+1)),((y+1,x),(y+1,x+1)))
 
 symHG :: HalfGate -> HalfGate
 symHG (y,x) = (x,y)
@@ -161,22 +173,24 @@ isValidTurn (Move c@(cY,cX)) = do
             in any isSideHop [(cY, cppX),(cppY, cX)]
 
       vacant = isVacant c gs
-      valid = case distance c cpp of
+      validCell = isValidCell c
+      validMove = case distance c cpp of
         1 -> isHGClear (c, cpp)
         2 -> isValidJump
         _ -> False
-  return $ valid && vacant
+  return $ validCell && validMove && vacant
 
 isValidTurn (PutGate g) = do
   gs <- get
-  let hgs = halfGates gs
+  let validGate = all isValidCell $ gateToCells g
+      hgs = halfGates gs
       p = currP gs
-      noGate = isGateSpaceClear g hgs
+      noOtherGate = isGateSpaceClear g hgs
       haveGates = gatesLeft p > 0
       wontBlockPlayer p = dfs (pos p) (isWinningCell p) $
         gs { halfGates = insertGate g hgs }
       wontBlock = all wontBlockPlayer $ playerList gs
-  return $ noGate && haveGates && wontBlock
+  return $ validGate && noOtherGate && haveGates && wontBlock
 
 actTurn :: Turn -> Game ()
 actTurn (Move c) = modify $ modifyCurrP $ \p -> p {pos = c}

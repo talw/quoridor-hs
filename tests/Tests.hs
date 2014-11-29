@@ -7,12 +7,6 @@ import Control.Monad.State
 testCase :: String -> Assertion -> Test
 testCase label assertion = TestLabel label (TestCase assertion)
 
-data Direction = H | V
-
-gateUpperLeft :: Cell -> Direction -> Gate
-gateUpperLeft (y,x) H = (((y,x),(y+1,x)),((y,x+1),(y+1,x+1)))
-gateUpperLeft (y,x) V = (((y,x),(y,x+1)),((y+1,x),(y+1,x+1)))
-
 main :: IO Counts
 main = runTestTT $ TestList accumulateTests
 {-main = runTestTT $ accumulateTests !! 10-}
