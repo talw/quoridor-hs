@@ -18,6 +18,3 @@ Work-in-progress.
 # Issues
 - Can't see errors with hdevtools when editing quoridor.hs the main file.
   Started after adding a test-suite to the cabal file
-- Have to repeat dependencies in build-depends on the test-suite
-  because I can't add the main module in the build-depends of
-  the test suite. Says it can't resolve package quoridor-hs by id
