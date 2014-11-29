@@ -15,6 +15,7 @@ gateUpperLeft (y,x) V = (((y,x),(y,x+1)),((y+1,x),(y+1,x+1)))
 
 main :: IO Counts
 main = runTestTT $ TestList accumulateTests
+{-main = runTestTT $ accumulateTests !! 10-}
 
 -- A gamestate to test
 -- Black's turn
@@ -44,7 +45,8 @@ someGameState = initialGameState {
 
 accumulateTests :: [Test]
 accumulateTests =
-  [ testCase "changeCurrPlayer" $ do
+  [
+    testCase "changeCurrPlayer" $ do
       let gs = someGameState
           gs' = execState changeCurrPlayer gs
       True @=? currP gs' /= currP gs
@@ -66,9 +68,14 @@ accumulateTests =
   , testCase "isValidTurn-putGate-valid" $
       True @=? evalState (isValidTurn $ PutGate $ gateUpperLeft (2,3) V)
                  someGameState
-  , testCase "isValidTurn-putGate-invalid" $
+  , testCase "isValidTurn-putGate-invalid-overlap" $
       False @=? evalState (isValidTurn $ PutGate $ gateUpperLeft (2,2) H)
                  someGameState
+  , testCase "isValidTurn-putGate-invalid-willBlock" $ do
+      let gs = someGameState
+          halfGates' = insertGate (gateUpperLeft (3,3) V) $ halfGates gs
+          gs' = gs { halfGates = halfGates' }
+      False @=? evalState (isValidTurn $ PutGate $ gateUpperLeft (3,3) H) gs'
   , testCase "makeTurn-move-valid" $ do
       let gs = someGameState
           (succeed, gs') = runState (makeTurn $ Move (4,4)) gs
@@ -85,7 +92,7 @@ accumulateTests =
   , testCase "makeTurn-putGate-valid" $ do
       let gs = someGameState
           ggs = halfGates gs
-          gateToInsert = gateUpperLeft (3,3) H
+          gateToInsert = gateUpperLeft (3,3) V
           (succeed, gs') = runState (makeTurn $ PutGate gateToInsert) gs
       True @=? succeed
       insertGate gateToInsert ggs @=? halfGates gs'

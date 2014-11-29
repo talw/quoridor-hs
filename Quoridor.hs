@@ -37,6 +37,9 @@ data GameState = GameState {
 
 --- static data
 
+andP :: (a -> Bool) -> (a -> Bool) -> a -> Bool
+andP = liftM2 (&&)
+
 initialGameState :: GameState
 initialGameState = GameState {
                      playerLoop = concat $ repeat [initP Black, initP White],
@@ -84,12 +87,17 @@ distance (y,x) (y',x') = abs (y' - y) + abs (x' - x)
 isAdj :: Cell -> Cell -> Bool
 isAdj = ((1 ==) .) . distance
 
+getAdj :: Cell -> [Cell]
+getAdj c@(y,x) = filter (allT $ (>= 0) `andP` (< boardSize)) adjs
+  where adjs = [(y-1,x),(y+1,x),(y,x-1),(y,x+1)]
+        allT pred (a,b) = all pred [a,b]
+
 isHalfGateSpaceClear  :: HalfGate -> HalfGates -> Bool
 isHalfGateSpaceClear = (not .) . S.member
 
 isGateSpaceClear  :: Gate -> HalfGates -> Bool
-isGateSpaceClear (h1, h2) = liftM2 (&&)
-  (isHalfGateSpaceClear h1) (isHalfGateSpaceClear h2)
+isGateSpaceClear (h1, h2) =
+  isHalfGateSpaceClear h1 `andP` isHalfGateSpaceClear h2
 
 symHG :: HalfGate -> HalfGate
 symHG (y,x) = (x,y)
@@ -103,6 +111,24 @@ isVacant c = all ((c /=) . pos) . playerList
 
 playerIndex :: Color -> [Player] -> Int
 playerIndex c = fromJust . findIndex ((c ==) . color)
+
+isWinningCell :: Player -> Cell -> Bool
+isWinningCell p (cy,_) = cy + startY == boardSize - 1
+  where (startY,_) = lookup' (color p) startPos
+
+dfs :: Cell -> (Cell -> Bool) -> GameState -> Bool
+dfs from pred gs = go from $ S.insert from S.empty
+  where
+    go from visited
+      | pred from = True
+      | otherwise = any throughThis reachableCells
+      where
+        reachableCells = filter (noGatePred `andP` vacantPred) $ getAdj from
+          where noGatePred adj = not $ S.member (from,adj) $ halfGates gs
+                vacantPred adj = isVacant adj gs
+        throughThis c
+          | S.member c visited = False
+          | otherwise = go c $ S.insert c visited
 
 
 
@@ -142,11 +168,15 @@ isValidTurn (Move c@(cY,cX)) = do
   return $ valid && vacant
 
 isValidTurn (PutGate g) = do
-  halfGates' <- gets halfGates
-  p <- gets currP
-  let noGate = isGateSpaceClear g halfGates'
+  gs <- get
+  let hgs = halfGates gs
+      p = currP gs
+      noGate = isGateSpaceClear g hgs
       haveGates = gatesLeft p > 0
-  return $ noGate && haveGates
+      wontBlockPlayer p = dfs (pos p) (isWinningCell p) $
+        gs { halfGates = insertGate g hgs }
+      wontBlock = all wontBlockPlayer $ playerList gs
+  return $ noGate && haveGates && wontBlock
 
 actTurn :: Turn -> Game ()
 actTurn (Move c) = modify $ modifyCurrP $ \p -> p {pos = c}
@@ -168,6 +198,4 @@ makeTurn t = do
 getWinner :: Game (Maybe Color)
 getWinner = do
   playerList <- gets playerList
-  return $ color <$> find didPlayerWin playerList
- where didPlayerWin (Player c (currY,_) _) = let (startY,_) = lookup' c startPos
-                                            in currY + startY == boardSize - 1
+  return $ color <$> find (\p -> isWinningCell p (pos p)) playerList
