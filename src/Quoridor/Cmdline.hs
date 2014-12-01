@@ -2,7 +2,7 @@ module Quoridor.Cmdline
 where
 
 import Quoridor.Cmdline.Render (render)
-import Quoridor.Parse (parseTurn)
+import Quoridor.Cmdline.Parse (parseTurn)
 import Quoridor
 
 cmdlineMain :: IO ()

@@ -1,4 +1,4 @@
-module Quoridor.Parse (parseTurn)
+module Quoridor.Cmdline.Parse (parseTurn)
 where
 
 import Quoridor
