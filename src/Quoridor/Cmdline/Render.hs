@@ -1,17 +1,34 @@
-module Quoridor.Cmdline.Render (render)
+module Quoridor.Cmdline.Render (render, someGameState)
 where
 
 import Quoridor
 import Data.List (sortBy, partition)
 import qualified Data.Set as S (toAscList)
+import Control.Monad
 
 render :: GameState -> IO ()
-render gs = go 0 (sortPlayers $ playerList gs) hhgs vhgs
-  where (hhgs, vhgs) = partitionHalfGates $ S.toAscList $ halfGates gs
-        go y ps hhgs vhgs
-          | y == boardSize = return ()
-          | otherwise = do
-              (ps', vhgs') <- renderTileRow y ps vhgs
+render gs = do
+  renderBoard gs
+  let p = currP gs
+  putStrLn $ "It's " ++ show (color p) ++ "'s Turn."
+  putStrLn "type    g (y,x) h/v   to place horizontal/vertical gate."
+  putStrLn "type    m (y,x)       to move."
+  newLine
+
+newLine :: IO ()
+newLine = putChar '\n'
+
+renderBoard :: GameState -> IO ()
+renderBoard gs = do
+  putStrLn $ "  " ++ unwords (map show [0..boardSize-1])
+  newLine
+  go 0 (sortPlayers $ playerList gs) hhgs vhgs
+    where (hhgs, vhgs) = partitionHalfGates $ S.toAscList $ halfGates gs
+          go y ps hhgs vhgs
+            | y == boardSize = return ()
+            | otherwise = do
+              let linePrefix = show y ++ " "
+              (ps', vhgs') <- putStr linePrefix >> renderTileRow y ps vhgs
               hhgs' <- renderBetweenRow y hhgs
               go (y+1) ps' hhgs' vhgs'
 
@@ -89,4 +106,3 @@ noP = 'e'
 noG = ' '
 hgc = '-'
 vgc = '|'
-
