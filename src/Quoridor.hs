@@ -96,8 +96,11 @@ isValidCell :: Cell -> Bool
 isValidCell = allT $ (>= 0) `andP` (< boardSize)
   where allT pred (a,b) = all pred [a,b]
 
+align :: HalfGate -> HalfGate
+align (c1,c2) = (min c1 c2, max c1 c2)
+
 isHalfGateSpaceClear  :: HalfGate -> HalfGates -> Bool
-isHalfGateSpaceClear = (not .) . S.member
+isHalfGateSpaceClear = (not .) . S.member . align
 
 isGateSpaceClear  :: Gate -> HalfGates -> Bool
 isGateSpaceClear (h1, h2) =
@@ -111,12 +114,8 @@ gateUpperLeft :: Cell -> Direction -> Gate
 gateUpperLeft (y,x) H = (((y,x),(y+1,x)),((y,x+1),(y+1,x+1)))
 gateUpperLeft (y,x) V = (((y,x),(y,x+1)),((y+1,x),(y+1,x+1)))
 
-symHG :: HalfGate -> HalfGate
-symHG (y,x) = (x,y)
-
 insertGate :: Gate -> HalfGates -> HalfGates
-insertGate (h1, h2) hgs = foldr S.insert hgs hgsToInsert
-  where hgsToInsert = [h1, symHG h1, h2, symHG h2]
+insertGate (h1, h2) = S.insert (align h2) . S.insert (align h1)
 
 isVacant :: Cell -> GameState -> Bool
 isVacant c = all ((c /=) . pos) . playerList
@@ -136,7 +135,7 @@ dfs from pred gs = go from $ S.insert from S.empty
       | otherwise = any throughThis reachableCells
       where
         reachableCells = filter (noGatePred `andP` vacantPred) $ getAdj from
-          where noGatePred adj = not $ S.member (from,adj) $ halfGates gs
+          where noGatePred adj = isHalfGateSpaceClear (from,adj) $ halfGates gs
                 vacantPred adj = isVacant adj gs
         throughThis c
           | S.member c visited = False

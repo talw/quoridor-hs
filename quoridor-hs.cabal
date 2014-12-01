@@ -20,6 +20,7 @@ library
   exposed-modules:     Quoridor
                        Quoridor.Cmdline
   other-modules:       Quoridor.Parse
+                       Quoridor.Cmdline.Render
   -- other-extensions:
   build-depends:       base >=4.7 && <4.8,
                        containers >=0.5 && <0.6,

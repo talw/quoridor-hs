@@ -9,7 +9,7 @@ testCase label assertion = TestLabel label (TestCase assertion)
 
 main :: IO Counts
 main = runTestTT $ TestList accumulateTests
-{-main = runTestTT $ accumulateTests !! 10-}
+{-main = runTestTT $ accumulateTests !! 7-}
 
 -- A gamestate to test
 -- Black's turn
