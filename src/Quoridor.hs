@@ -1,10 +1,12 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Quoridor
 where
 
 import qualified Data.Set as S
 import Data.List (elemIndex, findIndex, find)
 import Data.Maybe (fromJust)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), Applicative)
 import Control.Monad (liftM2, join)
 import qualified Data.Map as M
 import Control.Monad.State
@@ -15,7 +17,12 @@ type HalfGate = (Cell, Cell)
 type HalfGates = S.Set HalfGate
 type BoardSize = Int
 
-type Game = State GameState
+{-type Game = State GameState-}
+newtype Game m a = Game (StateT GameState m a)
+  deriving (Monad, MonadState GameState, MonadIO, Applicative, Functor)
+
+runGame :: Game m a -> GameState -> m (a, GameState)
+runGame (Game s) = runStateT s
 
 data Player = Player {
   color :: Color,
@@ -145,10 +152,10 @@ dfs from pred gs = go from $ S.insert from S.empty
 
 --- Game functions
 
-changeCurrPlayer :: Game ()
+changeCurrPlayer :: Monad m => Game m ()
 changeCurrPlayer = modify $ \s -> s {playerLoop = tail $ playerLoop s}
 
-isValidTurn :: Turn -> Game Bool
+isValidTurn :: Monad m => Turn -> Game m Bool
 isValidTurn (Move c@(cY,cX)) = do
   gs <- get
   let cpp@(cppX, cppY) = pos $ currP gs
@@ -191,9 +198,8 @@ isValidTurn (PutGate g) = do
       wontBlock = all wontBlockPlayer $ playerList gs
   return $ validGate && noOtherGate && haveGates && wontBlock
 
-actTurn :: Turn -> Game ()
+actTurn :: Monad m => Turn -> Game m ()
 actTurn (Move c) = modify $ modifyCurrP $ \p -> p {pos = c}
-
 actTurn (PutGate g) = do
     modify $ \s -> s { halfGates = insertGate g (halfGates s) }
     modify $ modifyCurrP $ \p -> p {gatesLeft = gatesLeft p - 1}
@@ -202,13 +208,13 @@ actTurn (PutGate g) = do
 
 --- exported functions
 
-makeTurn :: Turn -> Game Bool
+makeTurn :: Monad m => Turn -> Game m Bool
 makeTurn t = do
   valid <- isValidTurn t
   when valid $ actTurn t >> changeCurrPlayer
   return valid
 
-getWinner :: Game (Maybe Color)
+getWinner :: Monad m => Game m (Maybe Color)
 getWinner = do
   playerList <- gets playerList
   return $ color <$> find (\p -> isWinningCell p (pos p)) playerList

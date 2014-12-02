@@ -1,6 +1,7 @@
 import Test.HUnit
 import Quoridor
 import Control.Monad.State
+import Control.Applicative ((<$>))
 
 -- helper functions
 
@@ -37,49 +38,56 @@ someGameState = initialGameState {
                      gatesLeft = 0 }
           ]
 
+execGame :: Functor m => Game m a -> GameState -> m GameState
+execGame g gs = snd <$> runGame g gs
+
+evalGame :: Functor m => Game m a -> GameState -> m a
+evalGame g gs = fst <$> runGame g gs
+
 accumulateTests :: [Test]
 accumulateTests =
   [
     testCase "changeCurrPlayer" $ do
       let gs = someGameState
-          gs' = execState changeCurrPlayer gs
+      gs' <- execGame changeCurrPlayer gs
       True @=? currP gs' /= currP gs
       head (tail $ playerList gs) @=? currP gs'
       currP gs @=? last (playerList gs')
   , testCase "isValidTurn-1-move-valid" $ do
-      True @=? evalState (isValidTurn $ Move (3,2)) someGameState
-      True @=? evalState (isValidTurn $ Move (4,3)) someGameState
+      (True @=?) =<< evalGame (isValidTurn $ Move (3,2)) someGameState
+      (True @=?) =<< evalGame (isValidTurn $ Move (4,3)) someGameState
   , testCase "isValidTurn-1-move-invalid" $ do
-      False @=? evalState (isValidTurn $ Move (2,3)) someGameState
-      False @=? evalState (isValidTurn $ Move (3,4)) someGameState
+      (False @=?) =<< evalGame (isValidTurn $ Move (2,3)) someGameState
+      (False @=?) =<< evalGame (isValidTurn $ Move (3,4)) someGameState
   , testCase "isValidTurn-2-move-valid" $
-      True @=? evalState (isValidTurn $ Move (4,4)) someGameState
+      (True @=?) =<< evalGame (isValidTurn $ Move (4,4)) someGameState
   , testCase "isValidTurn-2-move-invalid" $ do
       let gs = someGameState
           halfGates' = insertGate (gateUpperLeft (3,4) H) $ halfGates gs
           gs' = gs { halfGates = halfGates' }
-      False @=? evalState (isValidTurn $ Move (4,4)) gs'
+      (False @=?) =<< evalGame (isValidTurn $ Move (4,4)) gs'
   , testCase "isValidTurn-putGate-valid" $
-      True @=? evalState (isValidTurn $ PutGate $ gateUpperLeft (2,3) V)
+      (True @=?) =<< evalGame (isValidTurn $ PutGate $ gateUpperLeft (2,3) V)
                  someGameState
   , testCase "isValidTurn-putGate-invalid-overlap" $
-      False @=? evalState (isValidTurn $ PutGate $ gateUpperLeft (2,2) H)
+      (False @=?) =<< evalGame (isValidTurn $ PutGate $ gateUpperLeft (2,2) H)
                  someGameState
   , testCase "isValidTurn-putGate-invalid-willBlock" $ do
       let gs = someGameState
           halfGates' = insertGate (gateUpperLeft (3,3) V) $ halfGates gs
           gs' = gs { halfGates = halfGates' }
-      False @=? evalState (isValidTurn $ PutGate $ gateUpperLeft (3,3) H) gs'
+      (False @=?) =<< evalGame
+        (isValidTurn $ PutGate $ gateUpperLeft (3,3) H) gs'
   , testCase "makeTurn-move-valid" $ do
       let gs = someGameState
-          (succeed, gs') = runState (makeTurn $ Move (4,4)) gs
+      (succeed, gs') <- runGame (makeTurn $ Move (4,4)) gs
       True @=? succeed
       let p' = last $ playerList gs'
       color (currP gs) @=? color p'
       (4,4) @=? pos p'
   , testCase "makeTurn-move-invalid" $ do
       let gs = someGameState
-          (succeed, gs') = runState (makeTurn $ Move  (3,5)) gs
+      (succeed, gs') <- runGame (makeTurn $ Move  (3,5)) gs
       False @=? succeed
       color (currP gs) @=? color (currP gs')
       (3,3) @=? pos (currP gs')
@@ -87,15 +95,15 @@ accumulateTests =
       let gs = someGameState
           ggs = halfGates gs
           gateToInsert = gateUpperLeft (3,3) V
-          (succeed, gs') = runState (makeTurn $ PutGate gateToInsert) gs
+      (succeed, gs') <- runGame (makeTurn $ PutGate gateToInsert) gs
       True @=? succeed
       insertGate gateToInsert ggs @=? halfGates gs'
   , testCase "getWinner-nothing" $
-      Nothing @=? evalState getWinner someGameState
+      (Nothing @=?) =<< evalGame getWinner someGameState
   , testCase "getWinner-black-won" $ do
       let gs = someGameState
           pl = playerList gs
           pl' = (head pl) { pos = (0,3) } : tail pl
           gs' = gs {playerLoop = concat $ repeat pl'}
-      Just (color $ currP gs) @=? evalState getWinner gs'
+      (Just (color $ currP gs) @=?) =<< evalGame getWinner gs'
   ]
