@@ -1,4 +1,4 @@
-module Quoridor.Cmdline.Render (render, someGameState)
+module Quoridor.Cmdline.Render (render)
 where
 
 import Quoridor
@@ -6,30 +6,41 @@ import Data.List (sortBy, partition)
 import qualified Data.Set as S (toAscList)
 import Control.Monad
 
+--- exported functions
+
 render :: GameState -> IO ()
 render gs = do
   renderBoard gs
   let p = currP gs
   putStrLn $ "It's " ++ show (color p) ++ "'s Turn."
-  putStrLn "type    g (y,x) h/v   to place horizontal/vertical gate."
-  putStrLn "type    m (y,x)       to move."
-  newLine
+    ++ " " ++ show (gatesLeft p) ++ " gates left."
+  putStrLn "type    g y x [h|v]   to place horizontal/vertical gate."
+  putStrLn "type    m y x       to move."
+  putNewLine
 
-newLine :: IO ()
-newLine = putChar '\n'
+
+
+--- helper functions
+
+putNewLine :: IO ()
+putNewLine = putChar '\n'
 
 renderBoard :: GameState -> IO ()
 renderBoard gs = do
-  putStrLn $ "  " ++ unwords (map show [0..boardSize-1])
-  newLine
+  putRulerLine
+  putNewLine
   go 0 (sortPlayers $ playerList gs) hhgs vhgs
-    where (hhgs, vhgs) = partitionHalfGates $ S.toAscList $ halfGates gs
+  putRulerLine
+  putNewLine
+    where putRulerLine = putStrLn $
+            linePadding ++ unwords (map show [0..boardSize-1])
+          (hhgs, vhgs) = partitionHalfGates $ S.toAscList $ halfGates gs
           go y ps hhgs vhgs
             | y == boardSize = return ()
             | otherwise = do
-              let linePrefix = show y ++ " "
-              (ps', vhgs') <- putStr linePrefix >> renderTileRow y ps vhgs
-              hhgs' <- renderBetweenRow y hhgs
+              let lineRuler = show y ++ tail linePadding
+              (ps', vhgs') <- putStr lineRuler >> renderTileRow y ps vhgs
+              hhgs' <- putStr linePadding >> renderBetweenRow y hhgs
               go (y+1) ps' hhgs' vhgs'
 
 partitionHalfGates :: [HalfGate] -> ([HalfGate],[HalfGate])
@@ -59,7 +70,7 @@ renderTileRow row = go row 0
           let p = headOrDefault dp ps
               vhg = headOrDefault dg vhgs
               isPlayerHere = pos p == (y,x)
-              isGateHere = fst vhg == (y,x)
+              isGateHere = vhg == ((y,x),(y,x+1))
               (cp, ps') = charAndList isPlayerHere noP (head $ show $ color p) ps
               (cg, vhgs') = charAndList isGateHere noG vgc vhgs
           putStr [cp,cg]
@@ -75,23 +86,6 @@ renderBetweenRow row = go row 0
               putStr (c:" ")
               go y (x+1) hhgs'
 
-someGameState :: GameState
-someGameState = initialGameState {
-                  halfGates = halfGates',
-                  playerLoop = concat $ repeat playerList'
-                }
-  where halfGates' = foldr insertGate (halfGates initialGameState) [
-            gateUpperLeft (2,3) H
-          , gateUpperLeft (2,4) V
-          ]
-        playerList' = [
-            Player { color = Black,
-                     pos = (3,3),
-                     gatesLeft = 1 }
-          , Player { color = White,
-                     pos = (3,4),
-                     gatesLeft = 0 }
-          ]
 
 
 -- constants
@@ -106,3 +100,6 @@ noP = 'e'
 noG = ' '
 hgc = '-'
 vgc = '|'
+
+linePadding :: String
+linePadding = replicate 2 ' '
