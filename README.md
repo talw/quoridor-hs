@@ -19,6 +19,10 @@ Work-in-progress.
       the concatenations (difference lists?)
     - Consider adding some of the static configuration variables, like
       board size to a data type and using the ReaderT monad inside Game
+    - dfs's visited list is made up for each sub traversal, instead of
+      there being just a universal one. Might be able to be solved by
+      sequencing the recursion with a state monad of the visited cells.
+      Avoid pre-optimization though. Wait for profiling results
 
 # Issues
 - Can't see errors with hdevtools when editing quoridor.hs the main file.

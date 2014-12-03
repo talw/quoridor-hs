@@ -5,10 +5,12 @@ import Quoridor.Cmdline.Render (render)
 import Quoridor.Cmdline.Parse (parseTurn)
 import Quoridor
 import Control.Monad.State
+import Control.Monad.Reader
 import Control.Monad
 
 cmdlineMain :: IO ()
-cmdlineMain = void $ runGame (play True "Good luck!") initialGameState
+cmdlineMain = void $ runGame (play True "Good luck!")
+                      defaultGameConfig
 {-cmdlineMain = play initialGameState True "Good luck!"-}
 
 {-play2 :: Bool -> String -> Game IO ()-}
@@ -28,7 +30,8 @@ cmdlineMain = void $ runGame (play True "Good luck!") initialGameState
 play :: Bool -> String -> Game IO ()
 play showBoard msg = do
   gs <- get
-  liftIO $ render gs
+  bs <- reader boardSize
+  liftIO $ render bs gs
   liftIO $ putStrLn msg
   strTurn <- liftIO getLine
   let eTurn = parseTurn strTurn

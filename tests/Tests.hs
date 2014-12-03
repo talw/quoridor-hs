@@ -12,6 +12,8 @@ main :: IO Counts
 main = runTestTT $ TestList accumulateTests
 {-main = runTestTT $ accumulateTests !! 7-}
 
+
+
 -- A gamestate to test
 -- Black's turn
 --      E E|E
@@ -21,11 +23,12 @@ main = runTestTT $ TestList accumulateTests
 --      E = empty tile, B = Black, W = White, |,- = Gates
 --      B is at 3,3 direction of y,x axis >,v
 someGameState :: GameState
-someGameState = initialGameState {
+someGameState = initgs {
                   halfGates = halfGates',
                   playerLoop = concat $ repeat playerList'
                 }
-  where halfGates' = foldr insertGate (halfGates initialGameState) [
+  where initgs = initialGameState defaultGameConfig
+        halfGates' = foldr insertGate (halfGates initgs) [
             gateUpperLeft (2,3) H
           , gateUpperLeft (2,4) V
           ]
@@ -38,11 +41,14 @@ someGameState = initialGameState {
                      gatesLeft = 0 }
           ]
 
+runGameTest :: Game m a -> GameState -> m (a, GameState)
+runGameTest g gs = runGameWithGameState g gs defaultGameConfig
+
 execGame :: Functor m => Game m a -> GameState -> m GameState
-execGame g gs = snd <$> runGame g gs
+execGame = (fmap snd .) . runGameTest
 
 evalGame :: Functor m => Game m a -> GameState -> m a
-evalGame g gs = fst <$> runGame g gs
+evalGame = (fmap fst .) . runGameTest
 
 accumulateTests :: [Test]
 accumulateTests =
@@ -80,14 +86,14 @@ accumulateTests =
         (isValidTurn $ PutGate $ gateUpperLeft (3,3) H) gs'
   , testCase "makeTurn-move-valid" $ do
       let gs = someGameState
-      (succeed, gs') <- runGame (makeTurn $ Move (4,4)) gs
+      (succeed, gs') <- runGameTest (makeTurn $ Move (4,4)) gs
       True @=? succeed
       let p' = last $ playerList gs'
       color (currP gs) @=? color p'
       (4,4) @=? pos p'
   , testCase "makeTurn-move-invalid" $ do
       let gs = someGameState
-      (succeed, gs') <- runGame (makeTurn $ Move  (3,5)) gs
+      (succeed, gs') <- runGameTest (makeTurn $ Move  (3,5)) gs
       False @=? succeed
       color (currP gs) @=? color (currP gs')
       (3,3) @=? pos (currP gs')
@@ -95,7 +101,7 @@ accumulateTests =
       let gs = someGameState
           ggs = halfGates gs
           gateToInsert = gateUpperLeft (3,3) V
-      (succeed, gs') <- runGame (makeTurn $ PutGate gateToInsert) gs
+      (succeed, gs') <- runGameTest (makeTurn $ PutGate gateToInsert) gs
       True @=? succeed
       insertGate gateToInsert ggs @=? halfGates gs'
   , testCase "getWinner-nothing" $

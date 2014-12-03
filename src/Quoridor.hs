@@ -10,6 +10,7 @@ import Control.Applicative ((<$>), Applicative)
 import Control.Monad (liftM2, join)
 import qualified Data.Map as M
 import Control.Monad.State
+import Control.Monad.Reader
 
 type Cell = (Int, Int) -- y, x
 type Gate = (HalfGate, HalfGate)
@@ -18,11 +19,15 @@ type HalfGates = S.Set HalfGate
 type BoardSize = Int
 
 {-type Game = State GameState-}
-newtype Game m a = Game (StateT GameState m a)
-  deriving (Monad, MonadState GameState, MonadIO, Applicative, Functor)
+newtype Game m a = Game (ReaderT GameConfig (StateT GameState m) a)
+  deriving (Monad, MonadState GameState, MonadIO,
+            Applicative, Functor, MonadReader GameConfig)
 
-runGame :: Game m a -> GameState -> m (a, GameState)
-runGame (Game s) = runStateT s
+runGame :: Game m a -> GameConfig -> m (a, GameState)
+runGame g gc = runGameWithGameState g (initialGameState gc) gc
+
+runGameWithGameState :: Game m a -> GameState -> GameConfig -> m (a, GameState)
+runGameWithGameState (Game g) gs gc = runStateT (runReaderT g gc) gs
 
 data Player = Player {
   color :: Color,
@@ -41,38 +46,41 @@ data GameState = GameState {
   halfGates :: HalfGates
 } deriving Show
 
+data GameConfig = GameConfig {
+  gatesPerPlayer :: Int,
+  boardSize :: Int
+} deriving Show
 
 
 --- static data
 
-andP :: (a -> Bool) -> (a -> Bool) -> a -> Bool
-andP = liftM2 (&&)
-
-initialGameState :: GameState
-initialGameState = GameState {
+initialGameState :: GameConfig -> GameState
+initialGameState gc = GameState {
                      playerLoop = concat $ repeat [initP Black, initP White],
                      halfGates = S.empty
                    }
   where initP c = Player {
                     color = c,
-                    pos = lookup' c startPos,
-                    gatesLeft = gatesPerPlayer
+                    pos = lookup' c $ startPos $ boardSize gc,
+                    gatesLeft = gatesPerPlayer gc
                   }
 
+defaultGameConfig :: GameConfig
+defaultGameConfig = GameConfig {
+  gatesPerPlayer = 10,
+  boardSize = 9
+}
 
-gatesPerPlayer :: Int
-gatesPerPlayer = 10
-
-boardSize :: BoardSize
-boardSize = 9
-
-startPos :: M.Map Color Cell
-startPos = M.fromList [(Black, (boardSize - 1,boardSize `div` 2)),
-                       (White, (0, boardSize `div` 2))]
+startPos :: Int -> M.Map Color Cell
+startPos bs = M.fromList [(Black, (bs - 1,bs `div` 2)),
+                       (White, (0, bs `div` 2))]
 
 
 
 --- helper functions
+
+andP :: (a -> Bool) -> (a -> Bool) -> a -> Bool
+andP = liftM2 (&&)
 
 modifyCurrP :: (Player -> Player) -> GameState -> GameState
 modifyCurrP f gs = gs {playerLoop = loop (playerList' gs)}
@@ -95,12 +103,12 @@ distance (y,x) (y',x') = abs (y' - y) + abs (x' - x)
 isAdj :: Cell -> Cell -> Bool
 isAdj = ((1 ==) .) . distance
 
-getAdj :: Cell -> [Cell]
-getAdj c@(y,x) = filter isValidCell adjs
+getAdj :: Int -> Cell -> [Cell]
+getAdj bs c@(y,x) = filter (isValidCell bs) adjs
   where adjs = [(y-1,x),(y+1,x),(y,x-1),(y,x+1)]
 
-isValidCell :: Cell -> Bool
-isValidCell = allT $ (>= 0) `andP` (< boardSize)
+isValidCell :: Int -> Cell -> Bool
+isValidCell bs = allT $ (>= 0) `andP` (< bs)
   where allT pred (a,b) = all pred [a,b]
 
 align :: HalfGate -> HalfGate
@@ -130,18 +138,18 @@ isVacant c = all ((c /=) . pos) . playerList
 playerIndex :: Color -> [Player] -> Int
 playerIndex c = fromJust . findIndex ((c ==) . color)
 
-isWinningCell :: Player -> Cell -> Bool
-isWinningCell p (cy,_) = cy + startY == boardSize - 1
-  where (startY,_) = lookup' (color p) startPos
+isWinningCell :: Int -> Player -> Cell -> Bool
+isWinningCell bs p (cy,_) = cy + startY == bs - 1
+  where (startY,_) = lookup' (color p) (startPos bs)
 
-dfs :: Cell -> (Cell -> Bool) -> GameState -> Bool
-dfs from pred gs = go from $ S.insert from S.empty
+dfs :: Cell -> (Cell -> Bool) -> Int -> GameState -> Bool
+dfs from pred bs gs = go from $ S.insert from S.empty
   where
     go from visited
       | pred from = True
       | otherwise = any throughThis reachableCells
       where
-        reachableCells = filter (noGatePred `andP` vacantPred) $ getAdj from
+        reachableCells = filter (noGatePred `andP` vacantPred) $ getAdj bs from
           where noGatePred adj = isHalfGateSpaceClear (from,adj) $ halfGates gs
                 vacantPred adj = isVacant adj gs
         throughThis c
@@ -158,6 +166,7 @@ changeCurrPlayer = modify $ \s -> s {playerLoop = tail $ playerLoop s}
 isValidTurn :: Monad m => Turn -> Game m Bool
 isValidTurn (Move c@(cY,cX)) = do
   gs <- get
+  bs <- reader boardSize
   let cpp@(cppX, cppY) = pos $ currP gs
       isHGClear = flip isHalfGateSpaceClear $ halfGates gs
       isStraight = cppY == cY || cppX == cX
@@ -179,7 +188,7 @@ isValidTurn (Move c@(cY,cX)) = do
             in any isSideHop [(cY, cppX),(cppY, cX)]
 
       vacant = isVacant c gs
-      validCell = isValidCell c
+      validCell = isValidCell bs c
       validMove = case distance c cpp of
         1 -> isHGClear (c, cpp)
         2 -> isValidJump
@@ -188,12 +197,13 @@ isValidTurn (Move c@(cY,cX)) = do
 
 isValidTurn (PutGate g) = do
   gs <- get
-  let validGate = all isValidCell $ gateToCells g
+  bs <- reader boardSize
+  let validGate = all (isValidCell bs) $ gateToCells g
       hgs = halfGates gs
       p = currP gs
       noOtherGate = isGateSpaceClear g hgs
       haveGates = gatesLeft p > 0
-      wontBlockPlayer p = dfs (pos p) (isWinningCell p) $
+      wontBlockPlayer p = dfs (pos p) (isWinningCell bs p) bs $
         gs { halfGates = insertGate g hgs }
       wontBlock = all wontBlockPlayer $ playerList gs
   return $ validGate && noOtherGate && haveGates && wontBlock
@@ -217,4 +227,5 @@ makeTurn t = do
 getWinner :: Monad m => Game m (Maybe Color)
 getWinner = do
   playerList <- gets playerList
-  return $ color <$> find (\p -> isWinningCell p (pos p)) playerList
+  bs <- reader boardSize
+  return $ color <$> find (\p -> isWinningCell bs p (pos p)) playerList
