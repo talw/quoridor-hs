@@ -1,47 +1,109 @@
-module Quoridor.Cmdline.Render (render)
+module Quoridor.Cmdline.Render (runRender)
 where
 
 import Quoridor
 import Data.List (sortBy, partition)
 import qualified Data.Set as S (toAscList)
 import Control.Monad
+import Control.Monad.State
+import Control.Monad.Reader
+import Control.Monad.Writer
+import qualified Data.DList as D
+
+type Render = ReaderT GameConfig
+                (StateT RenderState
+                (Writer (D.DList Char)))
+
+data RenderState = RenderState {
+  players :: [Player],
+  vertHalfGates :: [HalfGate],
+  horizHalfGates :: [HalfGate]
+}
 
 --- exported functions
 
-render :: Int -> GameState -> IO ()
-render bs gs = do
-  renderBoard bs gs
-  let p = currP gs
-  putStrLn $ "It's " ++ show (color p) ++ "'s Turn."
-    ++ " " ++ show (gatesLeft p) ++ " gates left."
-  putStrLn "type    g y x [h|v]   to place horizontal/vertical gate."
-  putStrLn "type    m y x       to move."
-  putNewLine
+runRender :: GameState -> GameConfig -> String
+runRender gs gc = D.toList w
+  where (_,w) =
+          runWriter (runStateT (runReaderT (render cp) gc) initialRenderState)
+        initialRenderState = RenderState ps vhgs hhgs
+        ps = sortPlayers $ playerList gs
+        (hhgs, vhgs) = partitionHalfGates $ S.toAscList $ halfGates gs
+        cp = currP gs
 
 
 
 --- helper functions
 
-putNewLine :: IO ()
-putNewLine = putChar '\n'
+render ::  Player -> Render ()
+render cp = do
+  renderBoard
+  tellLine $ "It's " ++ show (color cp) ++ "'s Turn."
+        ++ " " ++ show (gatesLeft cp) ++ " gates left."
+  tellLine "type    g y x [h|v]   to place horizontal/vertical gate."
+  tellLine "type    m y x       to move."
+  tellNewLine
 
-renderBoard :: Int -> GameState -> IO ()
-renderBoard bs gs = do
-  putRulerLine
-  putNewLine
-  go bs 0 (sortPlayers $ playerList gs) hhgs vhgs
-  putRulerLine
-  putNewLine
-    where putRulerLine = putStrLn $
-            linePadding ++ unwords (map show [0..bs-1])
-          (hhgs, vhgs) = partitionHalfGates $ S.toAscList $ halfGates gs
-          go bs y ps hhgs vhgs
-            | y == bs = return ()
-            | otherwise = do
-              let lineRuler = show y ++ tail linePadding
-              (ps', vhgs') <- putStr lineRuler >> renderTileRow bs y ps vhgs
-              hhgs' <- putStr linePadding >> renderBetweenRow bs y hhgs
-              go bs (y+1) ps' hhgs' vhgs'
+tellStr :: String -> Render ()
+tellStr str = tell $ D.fromList str
+
+tellLine :: String -> Render ()
+tellLine str = tellStr str >> tellNewLine
+
+tellNewLine :: Render ()
+tellNewLine = tellStr "\n"
+
+renderBoard :: Render ()
+renderBoard = do
+  bs <- reader boardSize
+  let go y
+        | y == bs = return ()
+        | otherwise = do
+            let lineRuler = show y ++ tail linePadding
+            tellStr lineRuler >> renderTileRow y
+            tellStr linePadding >> renderBetweenRow y
+            go $ y+1
+      tellRulerLine = tellLine $
+        linePadding ++ unwords (map show [0..bs-1])
+  tellRulerLine
+  tellNewLine
+  go 0
+  tellRulerLine
+  tellNewLine
+
+renderTileRow :: Int -> Render ()
+renderTileRow row = do
+  bs <- reader boardSize
+  let go y x
+        | x == bs = void $ tellStr "\n"
+        | otherwise = do
+            ps <- gets players
+            vhgs <- gets vertHalfGates
+            let p = headOrDefault dp ps
+                vhg = headOrDefault dg vhgs
+                isPlayerHere = pos p == (y,x)
+                isGateHere = vhg == ((y,x),(y,x+1))
+                (cp, ps') =
+                  charAndList isPlayerHere noP (head $ show $ color p) ps
+                (cg, vhgs') = charAndList isGateHere noG vgc vhgs
+            modify $ \s -> s { players = ps', vertHalfGates = vhgs' }
+            tellStr [cp,cg]
+            go y (x+1)
+  go row 0
+
+renderBetweenRow :: Int -> Render ()
+renderBetweenRow row = do
+  bs <- reader boardSize
+  let go y x
+        | x == bs = void $ tellStr "\n"
+        | otherwise = do
+            hhgs <- gets vertHalfGates
+            let isGateHere = headOrDefault dg hhgs == ((y,x),(y+1,x))
+                (c, hhgs') = charAndList isGateHere noG hgc hhgs
+            modify $ \s -> s { horizHalfGates = hhgs' }
+            tellStr (c:" ")
+            go y $ x+1
+  go row 0
 
 partitionHalfGates :: [HalfGate] -> ([HalfGate],[HalfGate])
 partitionHalfGates = partition $ \((y,x),(y',x')) -> x == x'
@@ -60,31 +122,6 @@ headOrDefault _ (x:xs) = x
 charAndList :: Bool -> Char -> Char -> [a] -> (Char, [a])
 charAndList b cFalse cTrue list = if b then (cTrue, tail list)
                                        else (cFalse, list)
-
-renderTileRow :: Int -> Int -> [Player] -> [HalfGate] -> IO ([Player],[HalfGate])
-renderTileRow bs row = go row 0
-  where
-    go y x ps vhgs
-      | x == bs = putChar '\n' >> return (ps, vhgs)
-      | otherwise = do
-          let p = headOrDefault dp ps
-              vhg = headOrDefault dg vhgs
-              isPlayerHere = pos p == (y,x)
-              isGateHere = vhg == ((y,x),(y,x+1))
-              (cp, ps') = charAndList isPlayerHere noP (head $ show $ color p) ps
-              (cg, vhgs') = charAndList isGateHere noG vgc vhgs
-          putStr [cp,cg]
-          go y (x+1) ps' vhgs'
-
-renderBetweenRow :: Int -> Int -> [HalfGate] -> IO [HalfGate]
-renderBetweenRow bs row = go row 0
-  where go y x hhgs
-          | x == bs = putChar '\n' >> return hhgs
-          | otherwise = do
-              let isGateHere = headOrDefault dg hhgs == ((y,x),(y+1,x))
-                  (c, hhgs') = charAndList isGateHere noG hgc hhgs
-              putStr (c:" ")
-              go y (x+1) hhgs'
 
 
 
