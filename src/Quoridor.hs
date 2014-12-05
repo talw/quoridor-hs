@@ -143,18 +143,20 @@ isWinningCell bs p (cy,_) = cy + startY == bs - 1
   where (startY,_) = lookup' (color p) (startPos bs)
 
 dfs :: Cell -> (Cell -> Bool) -> Int -> GameState -> Bool
-dfs from pred bs gs = go from $ S.insert from S.empty
+dfs from pred bs gs = evalState (go from) $ S.insert from S.empty
   where
-    go from visited
-      | pred from = True
-      | otherwise = any throughThis reachableCells
+    go from
+      | pred from = return True
+      | otherwise = or <$> mapM throughThis reachableCells
       where
         reachableCells = filter (noGatePred `andP` vacantPred) $ getAdj bs from
           where noGatePred adj = isHalfGateSpaceClear (from,adj) $ halfGates gs
                 vacantPred adj = isVacant adj gs
-        throughThis c
-          | S.member c visited = False
-          | otherwise = go c $ S.insert c visited
+        throughThis c = do
+          visited <- get
+          if S.member c visited
+            then return False
+            else put (S.insert c visited) >> go c
 
 
 
