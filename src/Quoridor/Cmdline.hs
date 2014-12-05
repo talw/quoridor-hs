@@ -7,23 +7,30 @@ import Quoridor
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad
+import System.IO
 
 cmdlineMain :: IO ()
-cmdlineMain = void $ runGame (play True "Good luck!")
-                      defaultGameConfig
+cmdlineMain = void $ runGame (play stdin) defaultGameConfig
 
-play :: Bool -> String -> Game IO ()
-play showBoard msg = do
-  gs <- get
+runGameFromScript :: IO ()
+runGameFromScript = do
+  handle <- openFile "moves" ReadMode
+  void $ runGame (play handle) defaultGameConfig
+
+play :: Handle -> Game IO ()
+play h = do
   gc <- ask
-  liftIO $ putStr $ runRender gs gc
-  liftIO $ putStrLn msg
-  strTurn <- liftIO getLine
-  let eTurn = parseTurn strTurn
-  case eTurn of
-    Left msg -> play False msg
-    Right turn -> do
-      wasValid <- makeTurn turn
-      play True $ "last Turn was "
-                  ++ (if not wasValid then "in" else "")
-                  ++ "valid"
+  let go showBoard msg = do
+        gs <- get
+        liftIO $ putStr $ runRender gs gc
+        liftIO $ putStrLn msg
+        strTurn <- liftIO $ hGetLine h
+        let eTurn = parseTurn strTurn
+        case eTurn of
+          Left msg -> go False msg
+          Right turn -> do
+            wasValid <- makeTurn turn
+            go True $ "last Turn was "
+                        ++ (if not wasValid then "in" else "")
+                        ++ "valid"
+  go True "Good luck!"

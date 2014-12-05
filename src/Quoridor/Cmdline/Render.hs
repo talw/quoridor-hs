@@ -97,7 +97,7 @@ renderBetweenRow row = do
   let go y x
         | x == bs = void $ tellStr "\n"
         | otherwise = do
-            hhgs <- gets vertHalfGates
+            hhgs <- gets horizHalfGates
             let isGateHere = headOrDefault dg hhgs == ((y,x),(y+1,x))
                 (c, hhgs') = charAndList isGateHere noG hgc hhgs
             modify $ \s -> s { horizHalfGates = hhgs' }
