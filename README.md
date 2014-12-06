@@ -1,10 +1,10 @@
-### quoridor-hs
+# quoridor-hs
 
 An implementation in Haskell of the 2-to-4-player strategy game
 
 Work in progress.
 
-# TODO
+### TODO
 - Features
     - Online multiplayer
     - Competent AI
