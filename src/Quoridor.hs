@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Quoridor
+
 where
 
 import qualified Data.Set as S
@@ -51,6 +52,8 @@ data GameConfig = GameConfig {
   boardSize :: Int
 } deriving Show
 
+gameConfig :: Int -> Int -> GameConfig
+gameConfig = GameConfig
 
 --- static data
 

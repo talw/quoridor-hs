@@ -3,19 +3,28 @@ where
 
 import Quoridor.Cmdline.Render (runRender)
 import Quoridor.Cmdline.Parse (parseTurn)
-import Quoridor
+import Quoridor (makeTurn, getWinner, Game, gameConfig, runGame)
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Reader
+import System.Environment (getArgs)
 import System.IO
+import Quoridor.Cmdline.Options (getSettings, Settings(..))
 
 cmdlineMain :: IO ()
-cmdlineMain = void $ runGame (play stdin) defaultGameConfig
+cmdlineMain = do
+  args <- getArgs
+  settings <- getSettings args
+  void $ runGame (play stdin) $
+    gameConfig (gatesPerPlayer settings) (boardSize settings)
 
-runGameFromScript :: IO ()
-runGameFromScript = do
-  handle <- openFile "moves" ReadMode
-  void $ runGame (play handle) defaultGameConfig
+{-runGameFromScript :: IO ()-}
+{-runGameFromScript = do-}
+  {-handle <- openFile "moves" ReadMode-}
+  {-void $ runGame (play handle) defaultGameConfig-}
+
+{-playLocalGame :: IO ()-}
+{-playLocalGame = void $ runGame (play stdin) defaultGameConfig-}
 
 play :: Handle -> Game IO ()
 play h = do
