@@ -12,6 +12,7 @@ import Control.Monad (liftM2, join)
 import qualified Data.Map as M
 import Control.Monad.State
 import Control.Monad.Reader
+import Control.Monad.Catch
 
 type Cell = (Int, Int) -- y, x
 type Gate = (HalfGate, HalfGate)
@@ -21,8 +22,12 @@ type BoardSize = Int
 
 {-type Game = State GameState-}
 newtype Game m a = Game (ReaderT GameConfig (StateT GameState m) a)
-  deriving (Monad, MonadState GameState, MonadIO,
-            Applicative, Functor, MonadReader GameConfig)
+  deriving (Monad, MonadState GameState, MonadIO
+           ,Applicative, Functor, MonadReader GameConfig
+           ,MonadThrow, MonadCatch, MonadMask)
+
+instance MonadTrans Game where
+  lift = Game . lift . lift
 
 runGame :: Game m a -> GameConfig -> m (a, GameState)
 runGame g gc = runGameWithGameState g (initialGameState gc) gc
@@ -40,7 +45,7 @@ data Turn = PutGate Gate | Move Cell
   deriving (Read, Show)
 
 data Color = Black | White
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Enum)
 
 data GameState = GameState {
   playerLoop :: [Player],
