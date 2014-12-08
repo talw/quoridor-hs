@@ -44,7 +44,8 @@ data Color = Black | White
 
 data GameState = GameState {
   playerLoop :: [Player],
-  halfGates :: HalfGates
+  halfGates :: HalfGates,
+  winner :: Maybe Color
 } deriving Show
 
 data GameConfig = GameConfig {
@@ -60,7 +61,8 @@ gameConfig = GameConfig
 initialGameState :: GameConfig -> GameState
 initialGameState gc = GameState {
                      playerLoop = concat $ repeat [initP Black, initP White],
-                     halfGates = S.empty
+                     halfGates = S.empty,
+                     winner = Nothing
                    }
   where initP c = Player {
                     color = c,
@@ -229,8 +231,10 @@ makeTurn t = do
   when valid $ actTurn t >> changeCurrPlayer
   return valid
 
-getWinner :: Monad m => Game m (Maybe Color)
-getWinner = do
+checkAndSetWinner :: Monad m => Game m (Maybe Color)
+checkAndSetWinner = do
   playerList <- gets playerList
   bs <- reader boardSize
-  return $ color <$> find (\p -> isWinningCell bs p (pos p)) playerList
+  let mWinner = color <$> find (\p -> isWinningCell bs p (pos p)) playerList
+  modify $ \s -> s { winner = mWinner }
+  return mWinner

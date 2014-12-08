@@ -3,7 +3,8 @@ where
 
 import Quoridor.Cmdline.Render (runRender)
 import Quoridor.Cmdline.Parse (parseTurn)
-import Quoridor (makeTurn, getWinner, Game, gameConfig, runGame)
+import Quoridor (makeTurn, checkAndSetWinner, Game, gameConfig, runGame,
+  Color(..), Turn, GameState(..), Player(..), currP)
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Reader
@@ -33,8 +34,7 @@ play h = do
         gs <- get
         liftIO $ putStr $ runRender gs gc
         liftIO $ putStrLn msg
-        mColor <- getWinner
-        case mColor of
+        case winner gs of
           Just c -> liftIO $ putStrLn $ show c ++ " won!"
           Nothing -> do
             strTurn <- liftIO $ hGetLine h

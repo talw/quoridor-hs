@@ -104,12 +104,12 @@ accumulateTests =
       (succeed, gs') <- runGameTest (makeTurn $ PutGate gateToInsert) gs
       True @=? succeed
       insertGate gateToInsert ggs @=? halfGates gs'
-  , testCase "getWinner-nothing" $
-      (Nothing @=?) =<< evalGame getWinner someGameState
-  , testCase "getWinner-black-won" $ do
+  , testCase "checkAndSetWinner-nothing" $
+      (Nothing @=?) =<< evalGame checkAndSetWinner someGameState
+  , testCase "checkAndSetWinner-black-won" $ do
       let gs = someGameState
           pl = playerList gs
           pl' = (head pl) { pos = (0,3) } : tail pl
           gs' = gs {playerLoop = concat $ repeat pl'}
-      (Just (color $ currP gs) @=?) =<< evalGame getWinner gs'
+      (Just (color $ currP gs) @=?) =<< evalGame checkAndSetWinner gs'
   ]
