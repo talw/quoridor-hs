@@ -38,24 +38,38 @@ cmdlineMain = do
 {-playLocalGame :: IO ()-}
 {-playLocalGame = void $ runGame (play stdin) defaultGameConfig-}
 
+
+
+-- Server and Client
+
 data ConnPlayer = ConnPlayer {
   coplSock :: Socket,
   coplColor :: Color
 }
 
-sendToPlayer :: (Show s, MonadIO m) => s -> ConnPlayer -> m ()
-sendToPlayer s cnp = do
-    send (coplSock cnp) $ B.pack $
+sendToSock :: (Show s, MonadIO m) => s -> Socket -> m ()
+sendToSock s sock = do
+    send sock $ B.pack $
       printf "%04s" $ hex $ show $ B.length serialized
-    send (coplSock cnp) serialized
+    send sock serialized
   where serialized = B.pack $ show s
 
-recvFromPlayer :: MonadIO m => ConnPlayer -> m String
-recvFromPlayer cnp = do
-  mHexSize <- recv (coplSock cnp) 4
+recvFromSock :: MonadIO m => Socket -> m String
+recvFromSock sock = do
+  mHexSize <- recv sock 4
   let ((size,_):_) = readHex $ B.unpack $ fromJust mHexSize
-  mValue <- recv (coplSock cnp) size
+  mValue <- recv sock size
   return $ B.unpack $ fromJust mValue
+
+
+
+-- Server
+
+sendToPlayer :: (Show s, MonadIO m) => s -> ConnPlayer -> m ()
+sendToPlayer s cnp = sendToSock s $ coplSock cnp
+
+recvFromPlayer :: MonadIO m => ConnPlayer -> m String
+recvFromPlayer cnp = recvFromSock $ coplSock cnp
 
 hostServer :: Game IO ()
 hostServer = listen (Host "127.0.0.1") "33996" $ \(lstnSock, hostAddr) -> do
