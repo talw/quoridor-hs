@@ -72,16 +72,16 @@ recvFromPlayer cnp = recvFromSock $ coplSock cnp
 
 hostServer :: Game IO ()
 hostServer = listen (Host "127.0.0.1") "33996" $ \(lstnSock, hostAddr) -> do
-    let getPlayers 0 socks = return socks
-        getPlayers n socks = accept lstnSock $
+    let getPlayers n socks | n > 0 = accept lstnSock $
           \(connSock, rmtAddr) -> getPlayers (n-1) $ connSock : socks
-    socks <- getPlayers 2 []
-    gc <- ask
-    let connPs = getConnPlayers socks
-    mapM_ (\p -> sendToPlayer (gc, coplColor p) p) connPs
-    playServer connPs
-  where getConnPlayers socks = zipWith ConnPlayer socks colors
-        colors = map toEnum [0..]
+        getPlayers 0 socks = do
+            gc <- ask
+            let colors = map toEnum [0..]
+                getConnPlayers socks = zipWith ConnPlayer socks colors
+                connPs = getConnPlayers socks
+            mapM_ (\p -> sendToPlayer (gc, coplColor p) p) connPs
+            playServer connPs
+    getPlayers 2 []
 
 playServer :: [ConnPlayer] -> Game IO ()
 playServer connPs = play "Good luck!"
@@ -100,14 +100,14 @@ playServer connPs = play "Good luck!"
                 let eTurn = parseTurn strTurn
                 case eTurn of
                   Left msg -> do
-                    sendToCurrPlayer msg
+                    sendToCurrPlayer (gs,msg)
                     execValidTurn
                   Right turn -> do
                     wasValid <- makeTurn turn
                     if wasValid
                       then return turn
                       else do
-                        sendToCurrPlayer "last Turn was invalid"
+                        sendToCurrPlayer (gs,"last Turn was invalid")
                         execValidTurn
           turn <- execValidTurn
           play $ show currColor ++ ":" ++ show turn
