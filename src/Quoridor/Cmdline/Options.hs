@@ -1,4 +1,4 @@
-module Quoridor.Cmdline.Options (getSettings, Settings(..))
+module Quoridor.Cmdline.Options (getOptions, Options(..), ExecMode(..))
 where
 
 import System.Console.GetOpt
@@ -6,71 +6,65 @@ import System.Exit (exitSuccess)
 import Data.Maybe (fromMaybe)
 import System.Environment (getProgName)
 
-data Settings = Settings {
-  boardSize :: Int,
-  gatesPerPlayer :: Int,
-  isLocal :: Bool,
-  isHost :: Bool,
-  hostStartPort :: Int,
-  isJoin :: Bool,
-  joinPorts :: [Int]
+data Options = Options {
+  opBoardSize :: Int,
+  opGatesPerPlayer :: Int,
+  opHostListenPort :: Int,
+  opExecMode :: ExecMode
 }
 
-defaultSettings :: Settings
-defaultSettings = Settings {
-  boardSize = 9,
-  gatesPerPlayer = 10,
-  isLocal = True,
-  isHost = False,
-  hostStartPort = 33996,
-  isJoin = False,
-  joinPorts = [33996,33997,33998,33999]
+data ExecMode = ExLocal | ExHost | ExJoin
+  deriving Eq
+
+defaultOptions :: Options
+defaultOptions = Options {
+  opBoardSize = 9,
+  opGatesPerPlayer = 10,
+  opHostListenPort = 33996,
+  opExecMode = ExLocal
 }
 
 -- exported functions
 
-getSettings :: [String] -> IO Settings
-getSettings args = do
+getOptions :: [String] -> IO Options
+getOptions args = do
   let (actions, nonOpts, msgs) = getOpt RequireOrder options args
-  foldl (>>=) (return defaultSettings) actions
+  foldl (>>=) (return defaultOptions) actions
 
 
 
 --helpers
 
-options :: [ OptDescr (Settings -> IO Settings) ]
+options :: [ OptDescr (Options -> IO Options) ]
 options =
     [ Option "b" ["board-size"]
         (ReqArg
-            (\arg settings -> return settings { boardSize = read arg })
+            (\arg opts -> return opts { opBoardSize = read arg })
             "INTEGER")
         "Board size (currently supports up to 9)"
 
     , Option "g" ["gates-per-player"]
         (ReqArg
-            (\arg settings -> return settings { gatesPerPlayer = read arg })
+            (\arg opts -> return opts { opGatesPerPlayer = read arg })
             "INTEGER")
         "Gates per player"
 
     , Option "l" ["local"]
         (NoArg
-            (\settings -> return settings {
-              isLocal = True, isHost = False, isJoin = False }))
+            (\opts -> return opts { opExecMode = ExLocal }))
         "Start a local game"
 
     , Option "h" ["host"]
         (OptArg
-            (\arg settings -> return settings {
-              isHost = True, isLocal = False, isJoin = False,
-              hostStartPort = maybe (hostStartPort settings) read arg })
+            (\arg opts -> return opts { opExecMode = ExHost,
+              opHostListenPort = maybe (opHostListenPort opts) read arg })
               "PORT")
         "Host a game server"
 
     , Option "j" ["join"]
         (OptArg
-            (\arg settings -> return settings {
-              isHost = True, isLocal = False, isJoin = False,
-              joinPorts = maybe (joinPorts settings) (return . read) arg })
+            (\arg opts -> return opts { opExecMode = ExJoin,
+              opHostListenPort = maybe (opHostListenPort opts) read arg })
               "PORT")
         "Join a game server"
 

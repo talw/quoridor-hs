@@ -10,7 +10,7 @@ import Control.Monad.State
 import Control.Monad.Reader
 import System.Environment (getArgs)
 import System.IO
-import Quoridor.Cmdline.Options (getSettings, Settings(..))
+import Quoridor.Cmdline.Options (getOptions, Options(..), ExecMode(..))
 
 import Network.Simple.TCP
 import qualified Data.ByteString.Char8 as B
