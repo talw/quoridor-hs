@@ -25,7 +25,7 @@ main = runTestTT $ TestList accumulateTests
 someGameState :: GameState
 someGameState = initgs {
                   halfGates = halfGates',
-                  playerLoop = concat $ repeat playerList'
+                  playerList = playerList'
                 }
   where initgs = initialGameState defaultGameConfig
         halfGates' = foldr insertGate (halfGates initgs) [
@@ -108,8 +108,6 @@ accumulateTests =
       (Nothing @=?) =<< evalGame checkAndSetWinner someGameState
   , testCase "checkAndSetWinner-black-won" $ do
       let gs = someGameState
-          pl = playerList gs
-          pl' = (head pl) { pos = (0,3) } : tail pl
-          gs' = gs {playerLoop = concat $ repeat pl'}
+          gs' = modifyCurrP (\p -> p { pos = (0,3) }) gs
       (Just (color $ currP gs) @=?) =<< evalGame checkAndSetWinner gs'
   ]

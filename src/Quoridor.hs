@@ -48,7 +48,7 @@ data Color = Black | White
   deriving (Eq, Show, Ord, Enum)
 
 data GameState = GameState {
-  playerLoop :: [Player],
+  playerList :: [Player],
   halfGates :: HalfGates,
   winner :: Maybe Color
 } deriving Show
@@ -65,7 +65,7 @@ gameConfig = GameConfig
 
 initialGameState :: GameConfig -> GameState
 initialGameState gc = GameState {
-                     playerLoop = concat $ repeat [initP Black, initP White],
+                     playerList = [initP Black, initP White],
                      halfGates = S.empty,
                      winner = Nothing
                    }
@@ -89,20 +89,19 @@ startPos bs = M.fromList [(Black, (bs - 1,bs `div` 2)),
 
 --- helper functions
 
+rotateList :: [a] -> [a]
+rotateList [] = []
+rotateList (x:xs) = xs ++ [x]
+
 andP :: (a -> Bool) -> (a -> Bool) -> a -> Bool
 andP = liftM2 (&&)
 
 modifyCurrP :: (Player -> Player) -> GameState -> GameState
-modifyCurrP f gs = gs {playerLoop = loop (playerList' gs)}
-  where playerList' s = f (currP s) : tail (playerList s)
-        loop = concat . repeat
-
-playerList :: GameState -> [Player]
-playerList gs = head pl : takeWhile (head pl /=) (tail pl)
-  where pl = playerLoop gs
+modifyCurrP f gs = gs {playerList = playerList'}
+  where playerList' = f (currP gs) : tail (playerList gs)
 
 currP :: GameState -> Player
-currP = head . playerLoop
+currP = head . playerList
 
 lookup' :: Ord k => k -> M.Map k a -> a
 lookup' = (fromJust .) . M.lookup
@@ -173,7 +172,7 @@ dfs from pred bs gs = evalState (go from) $ S.insert from S.empty
 --- Game functions
 
 changeCurrPlayer :: Monad m => Game m ()
-changeCurrPlayer = modify $ \s -> s {playerLoop = tail $ playerLoop s}
+changeCurrPlayer = modify $ \s -> s {playerList = rotateList $ playerList s}
 
 isValidTurn :: Monad m => Turn -> Game m Bool
 isValidTurn (Move c@(cY,cX)) = do
