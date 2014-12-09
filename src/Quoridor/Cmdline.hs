@@ -15,9 +15,8 @@ import Quoridor.Cmdline.Options (getSettings, Settings(..))
 import Network.Simple.TCP
 import qualified Data.ByteString.Char8 as B
 import Data.Maybe (fromJust)
-import Data.Hex (hex)
 import Text.Printf (printf)
-import Numeric (readHex)
+import Numeric (readHex, showHex)
 import Data.List (find)
 import Control.Applicative ((<$>))
 
@@ -50,7 +49,7 @@ data ConnPlayer = ConnPlayer {
 sendToSock :: (Show s, MonadIO m) => s -> Socket -> m ()
 sendToSock s sock = do
     send sock $ B.pack $
-      printf "%04s" $ hex $ show $ B.length serialized
+      traceId $ printf "%04s" $ showHex (B.length serialized) ""
     send sock serialized
   where serialized = B.pack $ show s
 
