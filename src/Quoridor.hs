@@ -39,24 +39,24 @@ data Player = Player {
   color :: Color,
   pos :: Cell,
   gatesLeft :: Int
-} deriving (Show, Eq)
+} deriving (Show, Eq, Read)
 
 data Turn = PutGate Gate | Move Cell
   deriving (Read, Show)
 
 data Color = Black | White
-  deriving (Eq, Show, Ord, Enum)
+  deriving (Eq, Show, Ord, Enum, Read)
 
 data GameState = GameState {
   playerList :: [Player],
   halfGates :: HalfGates,
   winner :: Maybe Color
-} deriving Show
+} deriving (Show, Read)
 
 data GameConfig = GameConfig {
   gatesPerPlayer :: Int,
   boardSize :: Int
-} deriving Show
+} deriving (Show, Read)
 
 gameConfig :: Int -> Int -> GameConfig
 gameConfig = GameConfig

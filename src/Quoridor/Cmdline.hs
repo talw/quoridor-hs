@@ -4,7 +4,7 @@ where
 import Quoridor.Cmdline.Render (runRender)
 import Quoridor.Cmdline.Parse (parseTurn)
 import Quoridor (makeTurn, checkAndSetWinner, Game, gameConfig, runGame,
-  Color(..), Turn, GameState(..), Player(..), currP)
+  Color(..), Turn, GameState(..), Player(..), currP, GameConfig)
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Reader
@@ -44,21 +44,21 @@ cmdlineMain = do
 data ConnPlayer = ConnPlayer {
   coplSock :: Socket,
   coplColor :: Color
-}
+} deriving Show
 
 sendToSock :: (Show s, MonadIO m) => s -> Socket -> m ()
 sendToSock s sock = do
     send sock $ B.pack $
-      traceId $ printf "%04s" $ showHex (B.length serialized) ""
+      printf "%04s" $ showHex (B.length serialized) ""
     send sock serialized
   where serialized = B.pack $ show s
 
-recvFromSock :: MonadIO m => Socket -> m String
+recvFromSock :: (Read r, MonadIO m) => Socket -> m r
 recvFromSock sock = do
   mHexSize <- recv sock 4
   let ((size,_):_) = readHex $ B.unpack $ fromJust mHexSize
   mValue <- recv sock size
-  return $ B.unpack $ fromJust mValue
+  return $ read $ B.unpack $ fromJust mValue
 
 
 
@@ -111,6 +111,35 @@ playServer connPs = play "Good luck!"
                         execValidTurn
           turn <- execValidTurn
           play $ show currColor ++ ":" ++ show turn
+
+
+
+-- Client
+
+connectClient :: IO ()
+connectClient = connect "127.0.0.1" "33996" $ \(connSock, rmtAddr) -> do
+  (gc, c) <- recvFromSock connSock
+  playClient connSock gc c
+
+playClient :: Socket -> GameConfig -> Color -> IO ()
+playClient connSock gc myColor = play
+  where
+    play = do
+      (gs, msg) <- recvFromSock connSock
+      putStr $ runRender gs gc
+      putStrLn msg
+      case winner gs of
+        Just c -> liftIO $ putStrLn $ show c ++ " won!"
+        Nothing -> do
+          let currPC = color $ currP gs
+          if currPC /= myColor
+            then do
+              putStrLn $ "Waiting for " ++ show currPC ++ " to make a move."
+              play
+            else do
+              strTurn <- liftIO getLine
+              sendToSock strTurn connSock
+              play
 
 play :: Handle -> Game IO ()
 play h = do
