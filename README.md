@@ -6,11 +6,11 @@ Work in progress.
 
 ### TODO
 - Features
-    - Online multiplayer
     - Competent AI
     - A web application
 - Features (DONE)
-    - A CLI interface
+    - A CLI interface (cli interface is yet unpolished)
+    - Online multiplayer
 - Issues
     - Will have to move to a method where you calculate valid positions
       instead of getting a position and checking if it's valid.

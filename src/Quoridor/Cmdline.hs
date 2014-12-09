@@ -25,9 +25,13 @@ import Control.Applicative ((<$>))
 cmdlineMain :: IO ()
 cmdlineMain = do
   args <- getArgs
-  settings <- getSettings args
-  void $ runGame (play stdin) $
-    gameConfig (gatesPerPlayer settings) (boardSize settings)
+  opts <- getOptions args
+  case opExecMode opts of
+    ExLocal -> void $ runGame (play stdin) $
+      gameConfig (opGatesPerPlayer opts) (opBoardSize opts)
+    ExHost -> void $ runGame (hostServer $ opHostListenPort opts) $
+      gameConfig (opGatesPerPlayer opts) (opBoardSize opts)
+    ExJoin -> connectClient $ opHostListenPort opts
 
 {-runGameFromScript :: IO ()-}
 {-runGameFromScript = do-}
@@ -70,8 +74,8 @@ sendToPlayer s cnp = sendToSock s $ coplSock cnp
 recvFromPlayer :: MonadIO m => ConnPlayer -> m String
 recvFromPlayer cnp = recvFromSock $ coplSock cnp
 
-hostServer :: Game IO ()
-hostServer = listen (Host "127.0.0.1") "33996" $ \(lstnSock, hostAddr) -> do
+hostServer :: Int -> Game IO ()
+hostServer portStr = listen (Host "127.0.0.1") (show portStr) $ \(lstnSock, hostAddr) -> do
     let getPlayers n socks | n > 0 = accept lstnSock $
           \(connSock, rmtAddr) -> getPlayers (n-1) $ connSock : socks
         getPlayers 0 socks = do
@@ -116,8 +120,8 @@ playServer connPs = play "Good luck!"
 
 -- Client
 
-connectClient :: IO ()
-connectClient = connect "127.0.0.1" "33996" $ \(connSock, rmtAddr) -> do
+connectClient :: Int -> IO ()
+connectClient portStr = connect "127.0.0.1" (show portStr) $ \(connSock, rmtAddr) -> do
   (gc, c) <- recvFromSock connSock
   playClient connSock gc c
 
