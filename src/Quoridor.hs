@@ -232,7 +232,10 @@ actTurn (PutGate g) = do
 makeTurn :: Monad m => Turn -> Game m Bool
 makeTurn t = do
   valid <- isValidTurn t
-  when valid $ actTurn t >> changeCurrPlayer
+  when valid $ do
+    actTurn t
+    checkAndSetWinner
+    changeCurrPlayer
   return valid
 
 checkAndSetWinner :: Monad m => Game m (Maybe Color)
