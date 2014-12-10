@@ -11,6 +11,7 @@ import Control.Monad.Reader
 import System.Environment (getArgs)
 import System.IO
 import Quoridor.Cmdline.Options (getOptions, Options(..), ExecMode(..))
+import Quoridor.Cmdline.Messages
 
 import Network.Simple.TCP
 import qualified Data.ByteString.Char8 as B
@@ -79,7 +80,7 @@ hostServer portStr = listen (Host "127.0.0.1") (show portStr) $ \(lstnSock, host
     getPlayers 2 []
 
 playServer :: [ConnPlayer] -> Game IO ()
-playServer connPs = play "Good luck!"
+playServer connPs = play msgInitialTurn
   where
     play msg = do
       gs <- get
@@ -102,19 +103,20 @@ playServer connPs = play "Good luck!"
                     if wasValid
                       then return turn
                       else do
-                        sendToCurrPlayer (gs,"last Turn was invalid")
+                        sendToCurrPlayer (gs, msgInvalidTurn)
                         execValidTurn
           turn <- execValidTurn
-          play $ show currColor ++ ":" ++ show turn
+          play $ msgValidTurn currColor turn
 
 
 
 -- Client
 
 connectClient :: Int -> IO ()
-connectClient portStr = connect "127.0.0.1" (show portStr) $ \(connSock, rmtAddr) -> do
-  (gc, c) <- recvFromSock connSock
-  playClient connSock gc c
+connectClient portStr = connect "127.0.0.1" (show portStr) $
+  \(connSock, rmtAddr) -> do
+    (gc, c) <- recvFromSock connSock
+    playClient connSock gc c
 
 playClient :: Socket -> GameConfig -> Color -> IO ()
 playClient connSock gc myColor = play
@@ -124,12 +126,12 @@ playClient connSock gc myColor = play
       putStr $ runRender gs gc
       putStrLn msg
       case winner gs of
-        Just c -> liftIO $ putStrLn $ show c ++ " won!"
+        Just c -> liftIO $ putStrLn $ msgGameEnd c
         Nothing -> do
           let currPC = color $ currP gs
           if currPC /= myColor
             then do
-              putStrLn $ "Waiting for " ++ show currPC ++ " to make a move."
+              putStrLn $ msgAwaitingTurn currPC
               play
             else do
               strTurn <- liftIO getLine
@@ -144,7 +146,7 @@ play = do
         liftIO $ putStr $ runRender gs gc
         liftIO $ putStrLn msg
         case winner gs of
-          Just c -> liftIO $ putStrLn $ show c ++ " won!"
+          Just c -> liftIO $ putStrLn $ msgGameEnd c
           Nothing -> do
             strTurn <- liftIO getLine
             let eTurn = parseTurn strTurn
@@ -152,7 +154,7 @@ play = do
               Left msg -> go False msg
               Right turn -> do
                 wasValid <- makeTurn turn
-                go True $ "last Turn was "
-                            ++ (if not wasValid then "in" else "")
-                            ++ "valid"
-  go True "Good luck!"
+                go True $ if wasValid
+                  then msgValidTurn (color $ currP gs) turn
+                  else msgInvalidTurn
+  go True msgInitialTurn
