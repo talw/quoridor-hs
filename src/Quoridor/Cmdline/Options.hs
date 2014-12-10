@@ -8,6 +8,7 @@ import System.Environment (getProgName)
 
 data Options = Options {
   opBoardSize :: Int,
+  opNumOfPlayers :: Int,
   opGatesPerPlayer :: Int,
   opHostListenPort :: Int,
   opExecMode :: ExecMode
@@ -19,6 +20,7 @@ data ExecMode = ExLocal | ExHost | ExJoin
 defaultOptions :: Options
 defaultOptions = Options {
   opBoardSize = 9,
+  opNumOfPlayers = 2,
   opGatesPerPlayer = 10,
   opHostListenPort = 33996,
   opExecMode = ExLocal
@@ -41,7 +43,13 @@ options =
         (ReqArg
             (\arg opts -> return opts { opBoardSize = read arg })
             "INTEGER")
-        "Board size (currently supports up to 9)"
+        "Board size (2-9 rows/columns)"
+
+    , Option "n" ["number-of-players"]
+        (ReqArg
+            (\arg opts -> return opts { opNumOfPlayers = read arg })
+            "INTEGER")
+        "Number of players (2-4 players)"
 
     , Option "g" ["gates-per-player"]
         (ReqArg

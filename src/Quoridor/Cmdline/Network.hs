@@ -50,17 +50,18 @@ recvFromPlayer :: MonadIO m => ConnPlayer -> m String
 recvFromPlayer cnp = recvFromSock $ coplSock cnp
 
 hostServer :: Int -> Game IO ()
-hostServer portStr = listen (Host "127.0.0.1") (show portStr) $ \(lstnSock, hostAddr) -> do
+hostServer portStr = listen (Host "127.0.0.1") (show portStr) $
+  \(lstnSock, hostAddr) -> do
+    gc <- ask
     let getPlayers n socks | n > 0 = accept lstnSock $
           \(connSock, rmtAddr) -> getPlayers (n-1) $ connSock : socks
         getPlayers 0 socks = do
-            gc <- ask
             let colors = map toEnum [0..]
                 getConnPlayers socks = zipWith ConnPlayer socks colors
                 connPs = getConnPlayers socks
             mapM_ (\p -> sendToPlayer (gc, coplColor p) p) connPs
             playServer connPs
-    getPlayers 2 []
+    getPlayers (numOfPlayers gc) []
 
 playServer :: [ConnPlayer] -> Game IO ()
 playServer connPs = play msgInitialTurn

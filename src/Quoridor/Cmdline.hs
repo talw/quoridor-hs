@@ -4,8 +4,8 @@ where
 import Quoridor.Cmdline.Render (runRender)
 import Quoridor.Cmdline.Parse (parseTurn)
 import Quoridor.Cmdline.Network (hostServer, connectClient)
-import Quoridor (makeTurn, checkAndSetWinner, Game, gameConfig, runGame,
-  Color(..), Turn, GameState(..), Player(..), currP, GameConfig)
+import Quoridor (makeTurn, checkAndSetWinner, Game, runGame,
+  Color(..), Turn, GameState(..), Player(..), currP, GameConfig(..))
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Reader
@@ -15,15 +15,20 @@ import Quoridor.Cmdline.Options (getOptions, Options(..), ExecMode(..))
 import Quoridor.Cmdline.Messages
 import Network.Simple.TCP (withSocketsDo)
 
+
+
 cmdlineMain :: IO ()
 cmdlineMain = do
   args <- getArgs
   opts <- getOptions args
+  let gc = GameConfig {
+          gatesPerPlayer = opGatesPerPlayer opts,
+          boardSize = opBoardSize opts,
+          numOfPlayers = opNumOfPlayers opts
+        }
   case opExecMode opts of
-    ExLocal -> runGame play $
-      gameConfig (opGatesPerPlayer opts) (opBoardSize opts)
-    ExHost -> withSocketsDo $ runGame (hostServer $ opHostListenPort opts) $
-      gameConfig (opGatesPerPlayer opts) (opBoardSize opts)
+    ExLocal -> runGame play gc
+    ExHost -> withSocketsDo $ runGame (hostServer $ opHostListenPort opts) gc
     ExJoin -> withSocketsDo $ connectClient $ opHostListenPort opts
 
 

@@ -44,7 +44,7 @@ data Player = Player {
 data Turn = PutGate Gate | Move Cell
   deriving (Read, Show)
 
-data Color = Black | White
+data Color = Black | White | Red | Green
   deriving (Eq, Show, Ord, Enum, Read)
 
 data GameState = GameState {
@@ -55,20 +55,19 @@ data GameState = GameState {
 
 data GameConfig = GameConfig {
   gatesPerPlayer :: Int,
-  boardSize :: Int
+  boardSize :: Int,
+  numOfPlayers :: Int
 } deriving (Show, Read)
-
-gameConfig :: Int -> Int -> GameConfig
-gameConfig = GameConfig
 
 --- static data
 
 initialGameState :: GameConfig -> GameState
-initialGameState gc = GameState {
-                     playerList = [initP Black, initP White],
-                     halfGates = S.empty,
-                     winner = Nothing
-                   }
+initialGameState gc =
+  GameState {
+    playerList = take (numOfPlayers gc) $ map (initP . toEnum) [0..],
+    halfGates = S.empty,
+    winner = Nothing
+  }
   where initP c = Player {
                     color = c,
                     pos = lookup' c $ startPos $ boardSize gc,
@@ -78,12 +77,16 @@ initialGameState gc = GameState {
 defaultGameConfig :: GameConfig
 defaultGameConfig = GameConfig {
   gatesPerPlayer = 10,
-  boardSize = 9
+  boardSize = 9,
+  numOfPlayers = 2
 }
 
 startPos :: Int -> M.Map Color Cell
-startPos bs = M.fromList [(Black, (bs - 1,bs `div` 2)),
-                       (White, (0, bs `div` 2))]
+startPos bs = M.fromList [(Black, (bs - 1,bs `div` 2))
+                         ,(White, (0, bs `div` 2))
+                         ,(Red, (bs `div` 2, 0))
+                         ,(Green, (bs `div` 2, bs - 1))
+                         ]
 
 
 
@@ -148,8 +151,10 @@ playerIndex :: Color -> [Player] -> Int
 playerIndex c = fromJust . findIndex ((c ==) . color)
 
 isWinningCell :: Int -> Player -> Cell -> Bool
-isWinningCell bs p (cy,_) = cy + startY == bs - 1
-  where (startY,_) = lookup' (color p) (startPos bs)
+isWinningCell bs p (cy,cx)
+  | startX == bs `div` 2 = cy + startY == bs - 1
+  | startY == bs `div` 2 = cx + startX == bs - 1
+  where (startY,startX) = lookup' (color p) (startPos bs)
 
 dfs :: Cell -> (Cell -> Bool) -> Int -> GameState -> Bool
 dfs from pred bs gs = evalState (go from) $ S.insert from S.empty
