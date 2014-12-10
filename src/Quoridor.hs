@@ -29,8 +29,8 @@ newtype Game m a = Game (ReaderT GameConfig (StateT GameState m) a)
 instance MonadTrans Game where
   lift = Game . lift . lift
 
-runGame :: Game m a -> GameConfig -> m (a, GameState)
-runGame g gc = runGameWithGameState g (initialGameState gc) gc
+runGame :: Functor m => Game m a -> GameConfig -> m ()
+runGame g gc = void $ runGameWithGameState g (initialGameState gc) gc
 
 runGameWithGameState :: Game m a -> GameState -> GameConfig -> m (a, GameState)
 runGameWithGameState (Game g) gs gc = runStateT (runReaderT g gc) gs

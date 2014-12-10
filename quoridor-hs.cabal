@@ -23,6 +23,7 @@ library
                        Quoridor.Cmdline.Render
                        Quoridor.Cmdline.Options
                        Quoridor.Cmdline.Messages
+                       Quoridor.Cmdline.Network
   -- other-extensions:
   build-depends:       base >=4.7 && <4.8,
                        containers >=0.5 && <0.6,
