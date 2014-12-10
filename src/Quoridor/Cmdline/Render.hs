@@ -38,10 +38,11 @@ runRender gs gc = D.toList w
 render ::  Player -> Render ()
 render cp = do
   renderBoard
-  tellLine $ "It's " ++ show (color cp) ++ "'s Turn."
-        ++ " " ++ show (gatesLeft cp) ++ " gates left."
   tellLine "type    g y x [h|v]   to place horizontal/vertical gate."
   tellLine "type    m y x       to move."
+  tellNewLine
+  tellLine $ "It's " ++ show (color cp) ++ "'s Turn."
+        ++ " " ++ show (gatesLeft cp) ++ " gates left."
   tellNewLine
 
 tellStr :: String -> Render ()
