@@ -68,7 +68,7 @@ options =
               "PORT")
         "Join a game server"
 
-    , Option "h" ["help"]
+    , Option "?" ["help"]
         (NoArg
             (\_ -> do
                 prg <- getProgName
