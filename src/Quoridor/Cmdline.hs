@@ -27,20 +27,11 @@ cmdlineMain = do
   args <- getArgs
   opts <- getOptions args
   case opExecMode opts of
-    ExLocal -> void $ runGame (play stdin) $
+    ExLocal -> void $ runGame play $
       gameConfig (opGatesPerPlayer opts) (opBoardSize opts)
     ExHost -> void $ runGame (hostServer $ opHostListenPort opts) $
       gameConfig (opGatesPerPlayer opts) (opBoardSize opts)
     ExJoin -> connectClient $ opHostListenPort opts
-
-{-runGameFromScript :: IO ()-}
-{-runGameFromScript = do-}
-  {-handle <- openFile "moves" ReadMode-}
-  {-void $ runGame (play handle) defaultGameConfig-}
-
-{-playLocalGame :: IO ()-}
-{-playLocalGame = void $ runGame (play stdin) defaultGameConfig-}
-
 
 
 -- Server and Client
@@ -145,8 +136,8 @@ playClient connSock gc myColor = play
               sendToSock strTurn connSock
               play
 
-play :: Handle -> Game IO ()
-play h = do
+play :: Game IO ()
+play = do
   gc <- ask
   let go showBoard msg = do
         gs <- get
@@ -155,7 +146,7 @@ play h = do
         case winner gs of
           Just c -> liftIO $ putStrLn $ show c ++ " won!"
           Nothing -> do
-            strTurn <- liftIO $ hGetLine h
+            strTurn <- liftIO getLine
             let eTurn = parseTurn strTurn
             case eTurn of
               Left msg -> go False msg
