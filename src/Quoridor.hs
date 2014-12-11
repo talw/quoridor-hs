@@ -156,6 +156,23 @@ isWinningCell bs p (cy,cx)
   | startY == bs `div` 2 = cx + startX == bs - 1
   where (startY,startX) = lookup' (color p) (startPos bs)
 
+getValidMoves :: Cell -> Int -> GameState -> [Cell]
+getValidMoves c@(y,x) bs gs = validatedResult
+  where adjs = getAdj bs c
+        hgs = halfGates gs
+        noHgs src = filter (\c' -> isHalfGateSpaceClear (src,c') hgs)
+        result = concatMap
+          (\c' -> if isVacant c' gs then [c'] else plTr c') $ noHgs c adjs
+        validatedResult = filter (flip isVacant gs `andP` isValidCell bs) result
+
+        plTr c'@(y',x') = if null $ noHgs c' [c'']
+                    then noHgs c' sideCells
+                    else [c'']
+          where c'' = (y' + (y'-y), x' + (x'-x))
+                sideCells
+                  | y' == y = [(y'-1,x'),(y'+1,x')]
+                  | x' == x = [(y',x'-1),(y',x'+1)]
+
 dfs :: Cell -> (Cell -> Bool) -> Int -> GameState -> Bool
 dfs from pred bs gs = evalState (go from) $ S.insert from S.empty
   where
@@ -163,9 +180,7 @@ dfs from pred bs gs = evalState (go from) $ S.insert from S.empty
       | pred from = return True
       | otherwise = or <$> mapM throughThis reachableCells
       where
-        reachableCells = filter (noGatePred `andP` vacantPred) $ getAdj bs from
-          where noGatePred adj = isHalfGateSpaceClear (from,adj) $ halfGates gs
-                vacantPred adj = isVacant adj gs
+        reachableCells = getValidMoves from bs gs
         throughThis c = do
           visited <- get
           if S.member c visited
@@ -180,36 +195,10 @@ changeCurrPlayer :: Monad m => Game m ()
 changeCurrPlayer = modify $ \s -> s {playerList = rotateList $ playerList s}
 
 isValidTurn :: Monad m => Turn -> Game m Bool
-isValidTurn (Move c@(cY,cX)) = do
+isValidTurn (Move c) = do
   gs <- get
   bs <- reader boardSize
-  let cpp@(cppX, cppY) = pos $ currP gs
-      isHGClear = flip isHalfGateSpaceClear $ halfGates gs
-      isStraight = cppY == cY || cppX == cX
-      isValidJump
-        | isStraight =
-            let midC = ((cY + cppY) `div` 2, (cX + cppX) `div` 2)
-                midNotVacant = not $ isVacant midC gs
-                noGate = isHGClear (c, midC)
-                noGate2 = isHGClear (midC, cpp)
-            in  midNotVacant && noGate && noGate2
-        | otherwise =
-            let isSideHop (y,x) =
-                  let midNotVacant = not $ isVacant (y,x) gs
-                      gateExist = not $ isHGClear
-                        ( (y + (y - cppY), x + (x - cppX)),
-                          (y,x) )
-                      noGate = isHGClear ((y,x), c)
-                  in midNotVacant && noGate && gateExist
-            in any isSideHop [(cY, cppX),(cppY, cX)]
-
-      vacant = isVacant c gs
-      validCell = isValidCell bs c
-      validMove = case distance c cpp of
-        1 -> isHGClear (c, cpp)
-        2 -> isValidJump
-        _ -> False
-  return $ validCell && validMove && vacant
+  return $ c `elem` getValidMoves (pos $ currP gs) bs gs
 
 isValidTurn (PutGate g) = do
   gs <- get
