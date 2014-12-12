@@ -54,7 +54,13 @@ hostServer portStr = listen (Host "127.0.0.1") (show portStr) $
   \(lstnSock, hostAddr) -> do
     gc <- ask
     let getPlayers n socks | n > 0 = accept lstnSock $
-          \(connSock, rmtAddr) -> getPlayers (n-1) $ connSock : socks
+          \(connSock, rmtAddr) -> do
+            let msg = "Connected. " ++ if n > 1
+                  then "Waiting for other players."
+                  else "Game begins."
+            liftIO $ putStrLn msg
+            sendToSock msg connSock
+            getPlayers (n-1) $ connSock : socks
         getPlayers 0 socks = do
             let colors = map toEnum [0..]
                 getConnPlayers socks = zipWith ConnPlayer socks colors
@@ -99,6 +105,8 @@ playServer connPs = play msgInitialTurn
 connectClient :: Int -> IO ()
 connectClient portStr = connect "127.0.0.1" (show portStr) $
   \(connSock, rmtAddr) -> do
+    msg <- recvFromSock connSock
+    putStrLn msg
     (gc, c) <- recvFromSock connSock
     playClient connSock gc c
 
