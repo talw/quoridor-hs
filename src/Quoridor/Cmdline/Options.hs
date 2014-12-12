@@ -1,10 +1,12 @@
 module Quoridor.Cmdline.Options (getOptions, Options(..), ExecMode(..))
 where
 
+import Quoridor.Helpers (andP)
 import System.Console.GetOpt
-import System.Exit (exitSuccess)
+import System.Exit (exitSuccess, exitFailure)
 import Data.Maybe (fromMaybe)
 import System.Environment (getProgName)
+import Control.Monad
 
 data Options = Options {
   opBoardSize :: Int,
@@ -37,19 +39,34 @@ getOptions args = do
 
 --helpers
 
+isInRange :: Ord a => a -> a -> a -> Bool
+isInRange a b c = ((>= b) `andP` (<= c)) a
+
 options :: [ OptDescr (Options -> IO Options) ]
 options =
-    [ Option "b" ["board-size"]
+    [ let optText = "Board size (2-9 rows/columns)"
+      in Option "b" ["board-size"]
         (ReqArg
-            (\arg opts -> return opts { opBoardSize = read arg })
+            (\arg opts -> do
+              let argNum = read arg :: Int
+              unless (isInRange argNum 2 9) $ do
+                putStrLn optText
+                exitFailure
+              return opts { opBoardSize = argNum })
             "INTEGER")
-        "Board size (2-9 rows/columns)"
+        optText
 
-    , Option "n" ["number-of-players"]
+    , let optText = "Number of players (2-4 players)"
+      in Option "n" ["number-of-players"]
         (ReqArg
-            (\arg opts -> return opts { opNumOfPlayers = read arg })
+            (\arg opts -> do
+              let argNum = read arg
+              unless (isInRange argNum 2 4) $ do
+                putStrLn optText
+                exitFailure
+              return opts { opNumOfPlayers = argNum })
             "INTEGER")
-        "Number of players (2-4 players)"
+        optText
 
     , Option "g" ["gates-per-player"]
         (ReqArg

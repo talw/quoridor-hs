@@ -4,6 +4,7 @@ module Quoridor
 
 where
 
+import Quoridor.Helpers
 import qualified Data.Set as S
 import Data.List (elemIndex, findIndex, find)
 import Data.Maybe (fromJust)
@@ -70,7 +71,7 @@ initialGameState gc =
   }
   where initP c = Player {
                     color = c,
-                    pos = lookup' c $ startPos $ boardSize gc,
+                    pos = unsafeLookup c $ startPos $ boardSize gc,
                     gatesLeft = gatesPerPlayer gc
                   }
 
@@ -92,22 +93,12 @@ startPos bs = M.fromList [(Black, (bs - 1,bs `div` 2))
 
 --- helper functions
 
-rotateList :: [a] -> [a]
-rotateList [] = []
-rotateList (x:xs) = xs ++ [x]
-
-andP :: (a -> Bool) -> (a -> Bool) -> a -> Bool
-andP = liftM2 (&&)
-
 modifyCurrP :: (Player -> Player) -> GameState -> GameState
 modifyCurrP f gs = gs {playerList = playerList'}
   where playerList' = f (currP gs) : tail (playerList gs)
 
 currP :: GameState -> Player
 currP = head . playerList
-
-lookup' :: Ord k => k -> M.Map k a -> a
-lookup' = (fromJust .) . M.lookup
 
 distance :: Cell -> Cell -> Int
 distance (y,x) (y',x') = abs (y' - y) + abs (x' - x)
@@ -154,7 +145,7 @@ isWinningCell :: Int -> Player -> Cell -> Bool
 isWinningCell bs p (cy,cx)
   | startX == bs `div` 2 = cy + startY == bs - 1
   | startY == bs `div` 2 = cx + startX == bs - 1
-  where (startY,startX) = lookup' (color p) (startPos bs)
+  where (startY,startX) = unsafeLookup (color p) (startPos bs)
 
 getValidMoves :: Cell -> Int -> GameState -> [Cell]
 getValidMoves c@(y,x) bs gs = validatedResult
@@ -221,7 +212,7 @@ actTurn (PutGate g) = do
 
 
 
---- exported functions
+--- exported functions (for modules other than Tests)
 
 makeTurn :: Monad m => Turn -> Game m Bool
 makeTurn t = do
