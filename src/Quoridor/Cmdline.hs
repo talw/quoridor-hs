@@ -1,7 +1,7 @@
 module Quoridor.Cmdline
 where
 
-import Quoridor.Cmdline.Render (runRender)
+import Quoridor.Cmdline.Render (runRender, runRenderColor, putColoredStr)
 import Quoridor.Cmdline.Parse (parseTurn)
 import Quoridor.Cmdline.Network (hostServer, connectClient)
 import Quoridor (makeTurn, checkAndSetWinner, Game, runGame,
@@ -31,13 +31,12 @@ cmdlineMain = do
     ExHost -> withSocketsDo $ runGame (hostServer $ opHostListenPort opts) gc
     ExJoin -> withSocketsDo $ connectClient $ opHostListenPort opts
 
-
 play :: Game IO ()
 play = do
   gc <- ask
   let go showBoard msg = do
         gs <- get
-        liftIO $ putStr $ runRender gs gc
+        liftIO $ putColoredStr $ runRenderColor gs gc
         liftIO $ putStrLn msg
         case winner gs of
           Just c -> liftIO $ putStrLn $ msgGameEnd c

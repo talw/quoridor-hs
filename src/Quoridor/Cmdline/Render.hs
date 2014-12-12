@@ -1,4 +1,4 @@
-module Quoridor.Cmdline.Render (runRender)
+module Quoridor.Cmdline.Render (runRender, runRenderColor, putColoredStr)
 where
 
 import Quoridor
@@ -9,6 +9,7 @@ import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Writer
 import qualified Data.DList as D
+import qualified System.Console.ANSI as CA
 
 type Render = ReaderT GameConfig
                 (StateT RenderState
@@ -31,6 +32,12 @@ runRender gs gc = D.toList w
         (hhgs, vhgs) = partitionHalfGates $ S.toAscList $ halfGates gs
         cp = currP gs
 
+runRenderColor :: GameState -> GameConfig -> (String, [IO ()])
+runRenderColor = (addColor .) . runRender
+
+putColoredStr :: (String, [IO ()]) -> IO ()
+putColoredStr (str, actions) = mapM_ putColoredChar $ zip str actions
+  where putColoredChar (c, action) = action >> putChar c
 
 
 --- helper functions
@@ -38,7 +45,7 @@ runRender gs gc = D.toList w
 render ::  Player -> Render ()
 render cp = do
   renderBoard
-  tellLine "type    g y x [h|v]   to place horizontal/vertical gate."
+  tellLine "type    g y x [h/v]   to place horizontal/vertical gate."
   tellLine "type    m y x       to move."
   tellNewLine
   tellLine $ "It's " ++ show (color cp) ++ "'s Turn."
@@ -85,7 +92,7 @@ renderTileRow row = do
                 isPlayerHere = pos p == (y,x)
                 isGateHere = vhg == ((y,x),(y,x+1))
                 (cp, ps') =
-                  charAndList isPlayerHere noP (head $ show $ color p) ps
+                  charAndList isPlayerHere noP (playerColorLetter $ color p) ps
                 (cg, vhgs') = charAndList isGateHere noG vgc vhgs
             modify $ \s -> s { players = ps', vertHalfGates = vhgs' }
             tellStr [cp,cg]
@@ -116,6 +123,9 @@ sortPlayers = sortBy func
           | pos p1 > pos p2 = GT
           | otherwise = EQ
 
+playerColorLetter :: Color -> Char
+playerColorLetter = head . show
+
 headOrDefault :: a -> [a] -> a
 headOrDefault x [] = x
 headOrDefault _ (x:xs) = x
@@ -123,6 +133,19 @@ headOrDefault _ (x:xs) = x
 charAndList :: Bool -> Char -> Char -> [a] -> (Char, [a])
 charAndList b cFalse cTrue list = if b then (cTrue, tail list)
                                        else (cFalse, list)
+
+addColor :: String -> (String, [IO ()])
+addColor str = (str, map addColor str)
+  where addColor ch = CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]
+          where
+            col
+              | ch == noP = CA.Yellow
+              | ch == hgc || ch == vgc = CA.Magenta
+              | ch == 'W' = CA.White
+              | ch == 'B' = CA.Blue
+              | ch == 'R' = CA.Red
+              | ch == 'G' = CA.Green
+              | otherwise = CA.White
 
 
 
@@ -134,7 +157,7 @@ dg :: ((Int, Int),(Int, Int))
 dg = ((-1,-1),(-1,-1))
 
 noP, noG, hgc, vgc :: Char
-noP = 'e'
+noP = 'E'
 noG = ' '
 hgc = '-'
 vgc = '|'

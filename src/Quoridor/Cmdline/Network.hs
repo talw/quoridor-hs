@@ -4,7 +4,7 @@ where
 import Quoridor
 import Quoridor.Cmdline.Messages
 import Quoridor.Cmdline.Parse
-import Quoridor.Cmdline.Render
+import Quoridor.Cmdline.Render (runRenderColor, putColoredStr)
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Reader
@@ -107,7 +107,7 @@ playClient connSock gc myColor = play
   where
     play = do
       (gs, msg) <- recvFromSock connSock
-      putStr $ runRender gs gc
+      putColoredStr $ runRenderColor gs gc
       putStrLn msg
       case winner gs of
         Just c -> liftIO $ putStrLn $ msgGameEnd c
