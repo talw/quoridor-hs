@@ -1,9 +1,13 @@
-import Test.HUnit
-import Quoridor
-import Control.Monad.State
-import Control.Applicative ((<$>))
-import Data.List (sort, find)
+module Main
+ ( main
+ ) where
+
+import Data.List  (find, sort)
 import Data.Maybe (fromJust)
+
+import Test.HUnit
+
+import Quoridor
 
 -- helper functions
 
@@ -26,22 +30,24 @@ main = runTestTT $ TestList accumulateTests
 --  4 E E E E
 --      E = empty tile, B = Black, W = White, |,- = Gates
 someGameState :: GameState
-someGameState = initgs {
-                  halfGates = halfGates',
-                  playerList = playerList'
-                }
+someGameState = initgs
+  { halfGates  = halfGates'
+  , playerList = playerList'
+  }
   where initgs = initialGameState defaultGameConfig
-        halfGates' = foldr insertGate (halfGates initgs) [
-            gateUpperLeft (2,3) H
+        halfGates' = foldr insertGate (halfGates initgs)
+          [ gateUpperLeft (2,3) H
           , gateUpperLeft (2,4) V
           ]
-        playerList' = [
-            Player { color = Black,
-                     pos = (3,3),
-                     gatesLeft = 1 }
-          , Player { color = White,
-                     pos = (3,4),
-                     gatesLeft = 0 }
+        playerList' =
+          [ Player { color     = Black
+                   , pos       = (3,3)
+                   , gatesLeft = 1
+                   }
+          , Player { color     = White
+                   , pos       = (3,4)
+                   , gatesLeft = 0
+                   }
           ]
 
 runGameTest :: Game m a -> GameState -> m (a, GameState)

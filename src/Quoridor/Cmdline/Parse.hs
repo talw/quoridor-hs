@@ -1,12 +1,15 @@
-module Quoridor.Cmdline.Parse (parseTurn)
-where
+module Quoridor.Cmdline.Parse
+  ( parseTurn
+  ) where
+
+import Control.Applicative (pure)
+import Data.Char           (toUpper)
+import Data.Functor        ((<$>))
+
+import Text.Parsec (Parsec, char, digit, eof, many1, oneOf, parse, spaces,
+                    (<|>))
 
 import Quoridor
-import Text.Parsec
-import Data.Char (toUpper)
-import Data.Functor ((<$>))
-import Control.Applicative (pure)
-import Data.Either (isLeft)
 
 type Parse = Parsec String ()
 
@@ -51,6 +54,12 @@ asToken p = spaces >> p
 
 -- exported functions
 
+-- | Given a string representing a turn,
+-- Parses it and returns the Turn
+--
+-- Note: This is not the same string as show turn, it is
+-- a more concise, for example: "m y x" to move
+-- to (y,x)
 parseTurn :: String -> Either String Turn
 parseTurn s = func $ parse pTurn "" s
   where func (Left errMsgs) = Left $ show errMsgs

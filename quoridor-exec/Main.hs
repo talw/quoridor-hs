@@ -1,6 +1,8 @@
-module Main where
+module Main
+ ( main
+ ) where
 
-import Quoridor.Cmdline
+import Quoridor.Cmdline (cmdlineMain)
 
 main :: IO ()
 main = cmdlineMain

@@ -1,9 +1,9 @@
 module Quoridor.Helpers
 where
 
-import Control.Monad
-import Data.Maybe
-import qualified Data.Map as M
+import           Control.Monad (liftM2)
+import qualified Data.Map      as M
+import           Data.Maybe    (fromJust)
 
 
 

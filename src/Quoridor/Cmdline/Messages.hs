@@ -1,6 +1,8 @@
-module Quoridor.Cmdline.Messages where
+-- | Messages to be printed to the player
+module Quoridor.Cmdline.Messages
+where
 
-import Quoridor
+import Quoridor (Color, Turn)
 
 msgAwaitingTurn :: Color -> String
 msgAwaitingTurn c = "Waiting for " ++ show c ++ " to make a move."

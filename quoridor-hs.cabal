@@ -38,6 +38,8 @@ library
                        ansi-terminal >=0.6.2
   -- hs-source-dirs:
   default-language:    Haskell2010
+  GHC-Options:         -Wall
+                       -fno-warn-unused-do-bind
 
 executable quoridor-exec
   hs-source-dirs:      quoridor-exec
@@ -45,6 +47,7 @@ executable quoridor-exec
   build-depends:       base >=4.7 && <4.8,
                        quoridor-hs
   default-language:    Haskell2010
+  GHC-Options:         -Wall
 
 test-suite quoridor-tests
   hs-source-dirs:      tests
@@ -55,3 +58,4 @@ test-suite quoridor-tests
                        mtl >=2.1 && <2.2
   default-language:    Haskell2010
   type:                exitcode-stdio-1.0
+  GHC-Options:         -Wall

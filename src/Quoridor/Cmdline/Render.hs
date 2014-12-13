@@ -1,28 +1,35 @@
-module Quoridor.Cmdline.Render (runRender, runRenderColor, putColoredStr)
-where
+module Quoridor.Cmdline.Render
+  ( runRender
+  , runRenderColor
+  , putColoredStr
+  ) where
+
+import           Control.Monad.Reader (ReaderT, reader, runReaderT)
+import           Control.Monad.State  (StateT, gets, modify, runStateT)
+import           Control.Monad.Writer (Writer, runWriter, tell, void)
+import           Data.List            (partition, sortBy)
+import qualified Data.Set             as S (toAscList)
+
+import qualified Data.DList          as D
+import qualified System.Console.ANSI as CA
 
 import Quoridor
-import Data.List (sortBy, partition)
-import qualified Data.Set as S (toAscList)
-import Control.Monad
-import Control.Monad.State
-import Control.Monad.Reader
-import Control.Monad.Writer
-import qualified Data.DList as D
-import qualified System.Console.ANSI as CA
+
+
 
 type Render = ReaderT GameConfig
                 (StateT RenderState
                 (Writer (D.DList Char)))
 
-data RenderState = RenderState {
-  players :: [Player],
-  vertHalfGates :: [HalfGate],
-  horizHalfGates :: [HalfGate]
-}
+data RenderState = RenderState
+  { players        :: [Player]
+  , vertHalfGates  :: [HalfGate]
+  , horizHalfGates :: [HalfGate]
+  }
 
 --- exported functions
 
+-- | Returns a String of the game board along with some basic info
 runRender :: GameState -> GameConfig -> String
 runRender gs gc = D.toList w
   where (_,w) =
@@ -32,9 +39,16 @@ runRender gs gc = D.toList w
         (hhgs, vhgs) = partitionHalfGates $ S.toAscList $ halfGates gs
         cp = currP gs
 
+-- | Returns a String of the game board along with some basic info,
+-- and a series of IO () actions, one per character, which describe how
+-- to set the terminal color. putColoredStr can be used to apply
+-- those actions automatically
 runRenderColor :: GameState -> GameConfig -> (String, [IO ()])
 runRenderColor = (addColor .) . runRender
 
+-- | Given an input such as the output of runRenderColor, writes the
+-- game board along with some basic info, to the screen, applying
+-- the IO actions to colorize the output.
 putColoredStr :: (String, [IO ()]) -> IO ()
 putColoredStr (str, actions) = mapM_ putColoredChar $ zip str actions
   where putColoredChar (c, action) = action >> putChar c
@@ -114,7 +128,7 @@ renderBetweenRow row = do
   go row 0
 
 partitionHalfGates :: [HalfGate] -> ([HalfGate],[HalfGate])
-partitionHalfGates = partition $ \((y,x),(y',x')) -> x == x'
+partitionHalfGates = partition $ \((_,x),(_,x')) -> x == x'
 
 sortPlayers :: [Player] -> [Player]
 sortPlayers = sortBy func
@@ -128,15 +142,15 @@ playerColorLetter = head . show
 
 headOrDefault :: a -> [a] -> a
 headOrDefault x [] = x
-headOrDefault _ (x:xs) = x
+headOrDefault _ (x:_) = x
 
 charAndList :: Bool -> Char -> Char -> [a] -> (Char, [a])
 charAndList b cFalse cTrue list = if b then (cTrue, tail list)
                                        else (cFalse, list)
 
 addColor :: String -> (String, [IO ()])
-addColor str = (str, map addColor str)
-  where addColor ch = CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]
+addColor str = (str, map addColorChar str)
+  where addColorChar ch = CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]
           where
             col
               | ch == noP = CA.Yellow
