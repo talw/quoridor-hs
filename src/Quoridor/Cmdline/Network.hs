@@ -3,11 +3,13 @@ module Quoridor.Cmdline.Network
   , connectClient
   ) where
 
+import           Control.Monad         (when)
 import           Control.Monad.Reader  (ask)
 import           Control.Monad.State   (MonadIO, get, liftIO)
 import qualified Data.ByteString.Char8 as B
 import           Data.List             (find)
 import           Data.Maybe            (fromJust)
+import           System.IO             (hReady, stdin)
 import           Text.Printf           (printf)
 
 import Network.Simple.TCP (HostPreference (Host), Socket, accept, connect,
@@ -123,6 +125,7 @@ playClient connSock gc myColor = play
   where
     play = do
       (gs, msg) <- recvFromSock connSock
+      flushInput
       putColoredStr $ runRenderColor gs gc
       putStrLn msg
       case winner gs of
@@ -137,3 +140,12 @@ playClient connSock gc myColor = play
               strTurn <- liftIO getLine
               sendToSock strTurn connSock
               play
+
+-- | This flushes command line input that was buffered while it wasn't the player's turn
+-- Otherwise, garbage that was being fed to input while it wasn't the player's turn, will
+-- be fed to the server and generate an error message per line, or even play a turn,
+-- which may or may not be intentional.
+flushInput :: IO ()
+flushInput = do
+  inputExists <- hReady stdin
+  when inputExists $ getLine >> flushInput
