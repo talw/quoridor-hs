@@ -78,7 +78,7 @@ playServer connPs = play msgInitialTurn
       gs <- get
       mapM_ (sendToPlayer (gs,msg)) connPs
       case winner gs of
-        Just _ -> return ()
+        Just _  -> return ()
         Nothing -> do
           let currColor = color $ currP gs
               currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
@@ -129,7 +129,7 @@ playClient connSock gc myColor = play
       putColoredStr $ runRenderColor gs gc
       putStrLn msg
       case winner gs of
-        Just c -> liftIO $ putStrLn $ msgGameEnd c
+        Just c  -> liftIO $ putStrLn $ msgGameEnd c
         Nothing -> do
           let currPC = color $ currP gs
           if currPC /= myColor

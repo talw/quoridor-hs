@@ -25,13 +25,13 @@ cmdlineMain = do
   opts <- getOptions args
   let gc = GameConfig
           { gatesPerPlayer = opGatesPerPlayer opts
-          , boardSize = opBoardSize opts
-          , numOfPlayers = opNumOfPlayers opts
+          , boardSize      = opBoardSize opts
+          , numOfPlayers   = opNumOfPlayers opts
           }
   case opExecMode opts of
     ExLocal -> runGame playLocal gc
-    ExHost -> withSocketsDo $ runGame (hostServer $ opHostListenPort opts) gc
-    ExJoin -> withSocketsDo $ connectClient $ opHostListenPort opts
+    ExHost  -> withSocketsDo $ runGame (hostServer $ opHostListenPort opts) gc
+    ExJoin  -> withSocketsDo $ connectClient $ opHostListenPort opts
   exitSuccess
 
 playLocal :: Game IO ()
@@ -42,7 +42,7 @@ playLocal = do
         when showBoard $ liftIO $ putColoredStr $ runRenderColor gs gc
         liftIO $ putStrLn msg
         case winner gs of
-          Just c -> liftIO $ putStrLn $ msgGameEnd c
+          Just c  -> liftIO $ putStrLn $ msgGameEnd c
           Nothing -> do
             strTurn <- liftIO getLine
             let eTurn = parseTurn strTurn
