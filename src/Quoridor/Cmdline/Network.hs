@@ -76,7 +76,8 @@ playServer connPs = play msgInitialTurn
   where
     play msg = do
       gs <- get
-      mapM_ (sendToPlayer (gs,msg)) connPs
+      vm <- getCurrentValidMoves
+      mapM_ (sendToPlayer (gs,vm,msg)) connPs
       case winner gs of
         Just _  -> return ()
         Nothing -> do
@@ -124,9 +125,9 @@ playClient :: Socket -> GameConfig -> Color -> IO ()
 playClient connSock gc myColor = play
   where
     play = do
-      (gs, msg) <- recvFromSock connSock
+      (gs, vm, msg) <- recvFromSock connSock
       flushInput
-      putColoredStr $ runRenderColor gs gc
+      putColoredStr $ runRenderColor gs gc vm
       putStrLn msg
       case winner gs of
         Just c  -> liftIO $ putStrLn $ msgGameEnd c

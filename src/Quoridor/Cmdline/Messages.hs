@@ -17,3 +17,12 @@ msgInvalidTurn, msgInitialTurn :: String
 msgInvalidTurn = "Attempted Turn was invalid"
 msgInitialTurn = "Good luck!"
 
+validMovesChars :: String
+validMovesChars = "!@#$%^&*"
+
+msgInputInstr :: String
+msgInputInstr = unlines
+  [ "type: g y x [h/v]   to place horizontal/vertical gate."
+  , "type: m y x         to move."
+  , "type one of: " ++ validMovesChars ++ " to move to where that character is on the board."
+  ]

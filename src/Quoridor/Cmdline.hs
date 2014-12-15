@@ -2,9 +2,11 @@ module Quoridor.Cmdline
   ( cmdlineMain
   ) where
 
+import Control.Applicative  ((<$>))
 import Control.Monad        (when)
 import Control.Monad.Reader (ask)
 import Control.Monad.State  (get, liftIO)
+import Data.List            (sort)
 import System.Environment   (getArgs)
 import System.Exit          (exitSuccess)
 
@@ -39,7 +41,8 @@ playLocal = do
   gc <- ask
   let go showBoard msg = do
         gs <- get
-        when showBoard $ liftIO $ putColoredStr $ runRenderColor gs gc
+        vm <- sort <$> getCurrentValidMoves
+        when showBoard $ liftIO $ renderBoard gs gc vm
         liftIO $ putStrLn msg
         case winner gs of
           Just c  -> liftIO $ putStrLn $ msgGameEnd c
@@ -54,3 +57,6 @@ playLocal = do
                   then msgValidTurn (color $ currP gs) turn
                   else msgInvalidTurn
   go True msgInitialTurn
+
+renderBoard :: GameState -> GameConfig -> [Cell] -> IO ()
+renderBoard gs gc vms = putColoredStr $ runRenderColor gs gc vms

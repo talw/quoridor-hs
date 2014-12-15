@@ -10,7 +10,7 @@ import           Control.Monad.Reader (MonadReader, ReaderT, reader,
 import           Control.Monad.State  (MonadIO, MonadState, MonadTrans, StateT,
                                        evalState, get, gets, lift, modify, put,
                                        runStateT, void, when)
-import           Data.List            (find, findIndex)
+import           Data.List            (find, findIndex, sort)
 import qualified Data.Map             as M
 import           Data.Maybe           (fromJust)
 import qualified Data.Set             as S
@@ -55,6 +55,7 @@ data Player = Player
 -- or a 'Player' move
 data Turn = PutGate Gate
           | Move Cell
+          | ShortCutMove Int
   deriving (Read, Show)
 
 -- | Colors to distinguish between 'Player's
@@ -169,6 +170,16 @@ isWinningCell bs p (cy,cx)
     | otherwise = error "startPos is not properly defined."
   where (startY,startX) = unsafeLookup (color p) (startPos bs)
 
+-- | Basically, translates a 'ShortCutMove' into the 'Move'
+-- that it is a shortcut of, using the integral index that
+-- is the index of the shortcut character in the list of
+-- 'validMovesChars'
+coerceTurn :: (Monad m, Functor m) => Turn -> Game m Turn
+coerceTurn (ShortCutMove i) = do
+  vmSorted <- sort <$> getCurrentValidMoves
+  return $ Move $ vmSorted !! i
+coerceTurn t = return t
+
 getValidMoves :: Cell -> Int -> GameState -> [Cell]
 getValidMoves c@(y,x) bs gs = validatedResult
   where adjs = getAdj bs c
@@ -211,13 +222,10 @@ changeCurrPlayer :: Monad m => Game m ()
 changeCurrPlayer = modify $ \s -> s {playerList = rotateList $ playerList s}
 
 -- | Checks if a given 'Turn' is valid, rule-wise.
--- It does it by perusing 'getValidMoves's returned
+-- It does it by perusing 'getCurrentValidMoves's returned
 -- list of all possible valid moves.
-isValidTurn :: Monad m => Turn -> Game m Bool
-isValidTurn (Move c) = do
-  gs <- get
-  bs <- reader boardSize
-  return $ c `elem` getValidMoves (pos $ currP gs) bs gs
+isValidTurn :: (Monad m, Functor m) => Turn -> Game m Bool
+isValidTurn (Move c) = (c `elem`) <$> getCurrentValidMoves
 
 isValidTurn (PutGate g) = do
   gs <- get
@@ -232,6 +240,8 @@ isValidTurn (PutGate g) = do
       wontBlock = all wontBlockPlayer $ playerList gs
   return $ validGate && noOtherGate && haveGates && wontBlock
 
+isValidTurn _ = error "bug with coerceTurn"
+
 -- | Acts upon a single 'Turn'.
 -- The difference with 'MakeTurn', is that MakeTurn calls this
 -- function and does more, like changing currentPlayer and
@@ -241,6 +251,7 @@ actTurn (Move c) = modify $ modifyCurrP $ \p -> p { pos = c }
 actTurn (PutGate g) = do
     modify $ \s -> s { halfGates = insertGate g (halfGates s) }
     modify $ modifyCurrP $ \p -> p { gatesLeft = gatesLeft p - 1 }
+actTurn _ = error "Bug with coerceTurn"
 
 -- | Checks if there's a winner, returning it if there is
 -- and sets the winner in the 'GameState'.
@@ -261,11 +272,19 @@ checkAndSetWinner = do
 -- whether or not a valid turn was requested.
 -- If an invalid turn was requested, it can be safely assumed
 -- that the GameState did not change.
-makeTurn :: Monad m => Turn -> Game m Bool
+makeTurn :: (Monad m, Functor m) => Turn -> Game m Bool
 makeTurn t = do
-  valid <- isValidTurn t
+  t' <- coerceTurn t
+  valid <- isValidTurn t'
   when valid $ do
-    actTurn t
+    actTurn t'
     checkAndSetWinner
     changeCurrPlayer
   return valid
+
+getCurrentValidMoves :: Monad m => Game m [Cell]
+getCurrentValidMoves = do
+  bs <- reader boardSize
+  gs <- get
+  let cell = pos $ currP gs
+  return $ getValidMoves cell bs gs
