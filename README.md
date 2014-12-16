@@ -2,6 +2,9 @@
 
 An implementation in Haskell of the 2-to-4-player strategy game
 
+Here's a description of the game's rules:
+http://en.wikipedia.org/wiki/Quoridor#Rules_of_the_game
+
 Work in progress.
 
 ### Install
@@ -10,7 +13,7 @@ as it's not polished enough.
 Will upload once given the green light from
 Haskellers much more experienced than I am.
 
-So for now, to install:
+To install:
 ~~~ {.bash}
 $ git clone https://github.com/talw/quoridor-hs.git
 $ cd quoridor-hs
