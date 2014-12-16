@@ -4,6 +4,22 @@ An implementation in Haskell of the 2-to-4-player strategy game
 
 Work in progress.
 
+### Install
+I'm holding out on uploading this to Hackage,
+as it's not polished enough.
+Will upload once given the green light from
+Haskellers much more experienced than I am.
+
+So for now, to install:
+~~~ {.bash}
+$ git clone https://github.com/talw/quoridor-hs.git
+$ cd quoridor-hs
+$ cabal install
+~~~
+
+After which you should have a quoridor-exec in your .cabal/bin
+or in dist/build/quoridor-exec/ where you 'cabal install'ed.
+
 ### TODO
 - Features
     - Competent AI
