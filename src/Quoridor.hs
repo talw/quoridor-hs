@@ -70,7 +70,7 @@ data Turn = PutGate Gate
   deriving (Read, Show)
 
 -- | Colors to distinguish between 'Player's
-data Color = Black | White | Red | Green
+data Color = Blue | White | Red | Green
   deriving (Eq, Show, Ord, Enum, Read)
 
 -- | The orientation (perhaps a better name?)
@@ -120,7 +120,7 @@ defaultGameConfig = GameConfig
 
 -- | Initial positions for the different 'Color's
 startPos :: Int -> M.Map Color Cell
-startPos bs = M.fromList [ (Black, (bs - 1,bs `div` 2))
+startPos bs = M.fromList [ (Blue, (bs - 1,bs `div` 2))
                          , (White, (0, bs `div` 2))
                          , (Red, (bs `div` 2, 0))
                          , (Green, (bs `div` 2, bs - 1))

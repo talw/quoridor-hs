@@ -2,12 +2,12 @@ module Main
  ( main
  ) where
 
-import Data.List  (find, sort)
-import Data.Maybe (fromJust)
+import           Data.List  (find, sort)
+import           Data.Maybe (fromJust)
 
-import Test.HUnit
+import           Test.HUnit
 
-import Quoridor
+import           Quoridor
 
 -- helper functions
 
@@ -21,14 +21,14 @@ main = runTestTT $ TestList accumulateTests
 
 
 -- A gamestate to test
--- Black's turn
+-- Blue's turn
 --    2 3 4 5
 --  2 E E E|E
 --      - -
 --  3 E B W|E
 --
 --  4 E E E E
---      E = empty tile, B = Black, W = White, |,- = Gates
+--      E = empty tile, B = Blue, W = White, |,- = Gates
 someGameState :: GameState
 someGameState = initgs
   { halfGates  = halfGates'
@@ -40,7 +40,7 @@ someGameState = initgs
           , gateUpperLeft (2,4) V
           ]
         playerList' =
-          [ Player { color     = Black
+          [ Player { color     = Blue
                    , pos       = (3,3)
                    , gatesLeft = 1
                    }
@@ -76,7 +76,7 @@ accumulateTests =
         validForColor c =
           getValidMoves (pos $ getPlayer c)
           (boardSize defaultGameConfig) someGameState
-      [(3,2),(4,3),(4,4)] @=? sort (validForColor Black)
+      [(3,2),(4,3),(4,4)] @=? sort (validForColor Blue)
       [(3,2),(4,4)] @=? sort (validForColor White)
 
   , testCase "isValidTurn-1-move-valid" $ do
