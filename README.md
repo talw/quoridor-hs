@@ -12,10 +12,10 @@ Work in progress.
     - A CLI interface (cli interface is yet unpolished)
     - Online multiplayer
 - Issues
-    - Will have to move to a method where you calculate valid positions
+- Issues (DONE)
+    - DONE - Will have to move to a method where you calculate valid positions
       instead of getting a position and checking if it's valid.
       It will fix some edge cases.
-- Issues (DONE)
     - DONE - Consider changing the rendering functions to return strings without
       causing IO. In which case use an efficient data structure to support
       the concatenations (difference lists?)
