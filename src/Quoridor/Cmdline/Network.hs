@@ -3,24 +3,26 @@ module Quoridor.Cmdline.Network
   , connectClient
   ) where
 
-import           Control.Monad         (when)
-import           Control.Monad.Reader  (ask)
-import           Control.Monad.State   (MonadIO, get, liftIO)
-import qualified Data.ByteString.Char8 as B
-import           Data.List             (find)
-import           Data.Maybe            (fromJust)
-import           System.IO             (hReady, stdin)
-import           Text.Printf           (printf)
+import           Control.Monad             (when)
+import           Control.Monad.Reader      (ask)
+import           Control.Monad.State       (MonadIO, get, liftIO)
+import qualified Data.ByteString.Char8     as B
+import           Data.List                 (find)
+import           Data.Maybe                (fromJust)
+import           System.IO                 (hReady, stdin)
+import           Text.Printf               (printf)
 
-import Network.Simple.TCP (HostPreference (Host), Socket, accept, connect,
-                           listen, recv, send)
-import Numeric            (readHex, showHex)
+import           Network.Simple.TCP        (HostPreference (Host), Socket,
+                                            accept, connect, listen, recv,
+                                            send)
+import           Numeric                   (readHex, showHex)
 
-import Quoridor
-import Quoridor.Cmdline.Messages (msgAwaitingTurn, msgGameEnd, msgInitialTurn,
-                                  msgInvalidTurn, msgValidTurn)
-import Quoridor.Cmdline.Parse    (parseTurn)
-import Quoridor.Cmdline.Render   (putColoredStr, runRenderColor)
+import           Quoridor
+import           Quoridor.Cmdline.Messages (msgAwaitingTurn, msgGameEnd,
+                                            msgInitialTurn, msgInvalidTurn,
+                                            msgValidTurn)
+import           Quoridor.Cmdline.Parse    (parseTurn)
+import           Quoridor.Cmdline.Render   (putColoredStr, runRenderColor)
 
 
 

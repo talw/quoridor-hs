@@ -2,17 +2,17 @@ module Quoridor.Cmdline.Parse
   ( parseTurn
   ) where
 
-import Control.Applicative (pure)
-import Data.Char           (toUpper)
-import Data.Functor        ((<$>))
-import Data.List           (elemIndex)
-import Data.Maybe          (fromJust)
+import           Control.Applicative       (pure)
+import           Data.Char                 (toUpper)
+import           Data.Functor              ((<$>))
+import           Data.List                 (elemIndex)
+import           Data.Maybe                (fromJust)
 
-import Text.Parsec (Parsec, char, digit, eof, many1, oneOf, parse, spaces,
-                    (<|>))
+import           Text.Parsec               (Parsec, char, digit, eof, many1,
+                                            oneOf, parse, spaces, (<|>))
 
-import Quoridor
-import Quoridor.Cmdline.Messages (validMovesChars)
+import           Quoridor
+import           Quoridor.Cmdline.Messages (validMovesChars)
 
 type Parse = Parsec String ()
 
@@ -30,6 +30,8 @@ pMove = do
   char 'm'
   Move <$> pCell
 
+-- one of 'validMovesChars', translated
+-- into their index.
 pShortCutMove :: Parse Turn
 pShortCutMove = do
     c <- oneOf validMovesChars

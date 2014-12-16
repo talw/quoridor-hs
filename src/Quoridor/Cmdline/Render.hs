@@ -4,24 +4,36 @@ module Quoridor.Cmdline.Render
   , putColoredStr
   ) where
 
-import           Control.Monad.Reader (ReaderT, reader, runReaderT)
-import           Control.Monad.State  (StateT, get, gets, modify, runStateT)
-import           Control.Monad.Writer (Writer, runWriter, tell, void)
-import           Data.List            (partition, sort, sortBy)
-import qualified Data.Set             as S (toAscList)
+import           Control.Monad.Reader      (ReaderT, reader, runReaderT)
+import           Control.Monad.State       (StateT, get, gets, modify,
+                                            runStateT)
+import           Control.Monad.Writer      (Writer, runWriter, tell, void)
+import           Data.List                 (partition, sort, sortBy)
+import qualified Data.Set                  as S (toAscList)
 
-import qualified Data.DList          as D
-import qualified System.Console.ANSI as CA
+import qualified Data.DList                as D
+import qualified System.Console.ANSI       as CA
 
-import Quoridor
-import Quoridor.Cmdline.Messages (msgInputInstr, validMovesChars)
+import           Quoridor
+import           Quoridor.Cmdline.Messages (msgInputInstr, validMovesChars)
 
 
 
+-- | Monad stack used for rendering the board.
+-- ReaderT with game configuration
+-- Writer for accumulating the String which represents the board
+-- StateT for a state of sorted lists o what is left to
+-- render on the board (e.g. players, gates).
 type Render = ReaderT GameConfig
                 (StateT RenderState
                 (Writer (D.DList Char)))
 
+-- | Sorted lists of what is left to render on the board.
+-- The rendering of the board is linear, and at every tile
+-- or in between tiles, whether something should be rendered there
+-- or not is checked. To avoid going over all the lists every turn,
+-- only the head is checked (but for that to be correct the lists
+-- must be sorted).
 data RenderState = RenderState
   { players             :: [Player]
   , vertHalfGates       :: [HalfGate]
@@ -79,6 +91,8 @@ tellLine str = tellStr str >> tellNewLine
 tellNewLine :: Render ()
 tellNewLine = tellStr "\n"
 
+-- | Actually specifies how to render the board.
+-- Using 'renderTileRow' and 'renderBetweenRow'
 renderBoard :: Render ()
 renderBoard = do
   bs <- reader boardSize
@@ -97,6 +111,8 @@ renderBoard = do
   tellRulerLine
   tellNewLine
 
+-- | Rendering of a tile row
+-- (i.e. a row with players and/or vertical gates potentially on it)
 renderTileRow :: Int -> Render ()
 renderTileRow row = do
   bs <- reader boardSize
@@ -121,7 +137,8 @@ renderTileRow row = do
             go y (x+1)
   go row 0
 
-
+-- | Rendering of a between row
+-- (i.e. a row with horizontal gates potentially on it)
 renderBetweenRow :: Int -> Render ()
 renderBetweenRow row = do
   bs <- reader boardSize
@@ -147,6 +164,7 @@ getCharAndList (x:xs) predicate cFalse cTrue
   | predicate x = (cTrue, xs)
   | otherwise = (cFalse, x:xs)
 
+-- | Partition 'HalfGate's into horizontal and vertical.
 partitionHalfGates :: [HalfGate] -> ([HalfGate],[HalfGate])
 partitionHalfGates = partition $ \((_,x),(_,x')) -> x == x'
 
@@ -160,6 +178,8 @@ sortPlayers = sortBy func
 colorLetter :: Color -> Char
 colorLetter = head . show
 
+-- | Given a board render, attaches an IO action per character
+-- that changes terminal color accordingly.
 addColor :: String -> (String, [IO ()])
 addColor str = (str, map addColorChar str)
   where addColorChar ch = CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]

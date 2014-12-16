@@ -2,23 +2,24 @@ module Quoridor.Cmdline
   ( cmdlineMain
   ) where
 
-import Control.Applicative  ((<$>))
-import Control.Monad        (when)
-import Control.Monad.Reader (ask)
-import Control.Monad.State  (MonadIO, get, liftIO)
-import Data.List            (sort)
-import System.Environment   (getArgs)
-import System.Exit          (exitSuccess)
+import           Control.Applicative       ((<$>))
+import           Control.Monad             (when)
+import           Control.Monad.Reader      (ask)
+import           Control.Monad.State       (MonadIO, get, liftIO)
+import           Data.List                 (sort)
+import           System.Environment        (getArgs)
+import           System.Exit               (exitSuccess)
 
-import Network.Simple.TCP (withSocketsDo)
+import           Network.Simple.TCP        (withSocketsDo)
 
-import Quoridor
-import Quoridor.Cmdline.Messages (msgGameEnd, msgInitialTurn, msgInvalidTurn,
-                                  msgValidTurn)
-import Quoridor.Cmdline.Network  (connectClient, hostServer)
-import Quoridor.Cmdline.Options  (ExecMode (..), Options (..), getOptions)
-import Quoridor.Cmdline.Parse    (parseTurn)
-import Quoridor.Cmdline.Render   (putColoredStr, runRenderColor)
+import           Quoridor
+import           Quoridor.Cmdline.Messages (msgGameEnd, msgInitialTurn,
+                                            msgInvalidTurn, msgValidTurn)
+import           Quoridor.Cmdline.Network  (connectClient, hostServer)
+import           Quoridor.Cmdline.Options  (ExecMode (..), Options (..),
+                                            getOptions)
+import           Quoridor.Cmdline.Parse    (parseTurn)
+import           Quoridor.Cmdline.Render   (putColoredStr, runRenderColor)
 
 -- | The main entry point to quoridor-exec
 cmdlineMain :: IO ()
@@ -36,6 +37,10 @@ cmdlineMain = do
     ExJoin  -> withSocketsDo $ connectClient $ opHostListenPort opts
   exitSuccess
 
+-- playLocal used to be structured similarly to
+-- playClient and playServer, but those functions
+-- seemed a bit monolithc to me, so I tried an alternative
+-- approach that, admittedly, I'm not sure is more readable.
 playLocal :: Game IO ()
 playLocal = go True msgInitialTurn
   where go showBoard msg = do
