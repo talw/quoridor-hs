@@ -17,11 +17,12 @@ To install:
 ~~~ {.bash}
 $ git clone https://github.com/talw/quoridor-hs.git
 $ cd quoridor-hs
+$ cabal sandbox init
 $ cabal install
 ~~~
 
-After which you should have a quoridor-exec in your .cabal/bin
-or in dist/build/quoridor-exec/ where you 'cabal install'ed.
+After which you should have a quoridor-exec in
+dist/build/quoridor-exec/ where you 'cabal install'ed.
 
 ### TODO
 - Features
