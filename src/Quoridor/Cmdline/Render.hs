@@ -1,7 +1,8 @@
 module Quoridor.Cmdline.Render
   ( runRender
   , runRenderColor
-  , putColoredStr
+  , putColoredStrTerm
+  , putColoredStrHtml
   ) where
 
 import           Control.Monad.Reader      (ReaderT, reader, runReaderT)
@@ -10,6 +11,7 @@ import           Control.Monad.State       (StateT, get, gets, modify,
 import           Control.Monad.Writer      (Writer, runWriter, tell, void)
 import           Data.List                 (partition, sort, sortBy)
 import qualified Data.Set                  as S (toAscList)
+import           Text.Printf               (printf)
 
 import qualified Data.DList                as D
 import qualified System.Console.ANSI       as CA
@@ -61,15 +63,23 @@ runRender gs gc vms = D.toList w
 -- and a series of IO () actions, one per character, which describe how
 -- to set the terminal color. putColoredStr can be used to apply
 -- those actions automatically
-runRenderColor :: GameState -> GameConfig -> [Cell] -> (String, [IO ()])
+runRenderColor :: GameState -> GameConfig -> [Cell] -> (String, [CA.Color])
 runRenderColor = ((addColor .) .) . runRender
 
 -- | Given an input such as the output of runRenderColor, writes the
 -- game board along with some basic info, to the screen, applying
 -- the IO actions to colorize the output.
-putColoredStr :: (String, [IO ()]) -> IO ()
-putColoredStr (str, actions) = mapM_ putColoredChar $ zip str actions
-  where putColoredChar (c, action) = action >> putChar c
+putColoredStrTerm :: (String, [CA.Color]) -> IO ()
+putColoredStrTerm (str, colors) = mapM_ putColoredChar $ zip str colors
+  where putColoredChar (ch, col) = colorToAction col >> putChar ch
+        colorToAction col =
+          CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]
+
+putColoredStrHtml :: (String, [CA.Color]) -> IO ()
+putColoredStrHtml (str, colors) = putStr $ concatMap addColorProp $ zip str colors
+  where addColorProp (ch, CA.White) = [ch]
+        addColorProp (ch, col) = printf "<font class=\"%s\">%c</font>" (show col) ch
+
 
 
 --- helper functions
@@ -180,18 +190,17 @@ colorLetter = head . show
 
 -- | Given a board render, attaches an IO action per character
 -- that changes terminal color accordingly.
-addColor :: String -> (String, [IO ()])
+addColor :: String -> (String, [CA.Color])
 addColor str = (str, map addColorChar str)
-  where addColorChar ch = CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]
-          where
-            col | ch == noP = CA.Yellow
-                | ch == hgc || ch == vgc = CA.Magenta
-                | ch `elem` validMovesChars = CA.Cyan
-                | ch == 'W' = CA.White
-                | ch == 'B' = CA.Blue
-                | ch == 'R' = CA.Red
-                | ch == 'G' = CA.Green
-                | otherwise = CA.White
+  where
+    addColorChar ch | ch == noP = CA.Yellow
+                    | ch == hgc || ch == vgc = CA.Magenta
+                    | ch `elem` validMovesChars = CA.Cyan
+                    | ch == 'W' = CA.White
+                    | ch == 'B' = CA.Blue
+                    | ch == 'R' = CA.Red
+                    | ch == 'G' = CA.Green
+                    | otherwise = CA.White
 
 
 

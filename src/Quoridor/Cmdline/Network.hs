@@ -22,7 +22,7 @@ import           Quoridor.Cmdline.Messages (msgAwaitingTurn, msgGameEnd,
                                             msgInitialTurn, msgInvalidTurn,
                                             msgValidTurn)
 import           Quoridor.Cmdline.Parse    (parseTurn)
-import           Quoridor.Cmdline.Render   (putColoredStr, runRenderColor)
+import           Quoridor.Cmdline.Render   (putColoredStrHtml, runRenderColor)
 
 
 
@@ -129,7 +129,7 @@ playClient connSock gc myColor = play
     play = do
       (gs, vm, msg) <- recvFromSock connSock
       flushInput
-      putColoredStr $ runRenderColor gs gc vm
+      putColoredStrHtml $ runRenderColor gs gc vm
       putStrLn msg
       case winner gs of
         Just c  -> liftIO $ putStrLn $ msgGameEnd c
