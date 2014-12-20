@@ -9,6 +9,7 @@ import           Control.Monad.State       (MonadIO, get, liftIO)
 import           Data.List                 (sort)
 import           System.Environment        (getArgs)
 import           System.Exit               (exitSuccess)
+import           System.IO                 (hFlush, stdout)
 
 import           Network.Simple.TCP        (withSocketsDo)
 
@@ -53,6 +54,7 @@ playLocal = go True msgInitialTurn
 
           when showBoard renderCurrentBoard
           liftIO $ putStrLn msg
+          liftIO $ hFlush stdout
           handleWinOrTurn gs
             wonAction $
             handleParse (liftIO getLine) parseFailAct parseSuccAct

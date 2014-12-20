@@ -1,21 +1,34 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Quoridor.Cmdline.Network
   ( hostServer
   , connectClient
   ) where
 
-import           Control.Monad             (when)
+import           Control.Concurrent        (forkIO)
+import           Control.Exception         (fromException, handle, throw)
+import           Control.Monad             (forever, unless, when)
 import           Control.Monad.Reader      (ask)
 import           Control.Monad.State       (MonadIO, get, liftIO)
-import qualified Data.ByteString.Char8     as B
+import qualified Data.ByteString           as B
+import qualified Data.ByteString.Char8     as BC
 import           Data.List                 (find)
 import           Data.Maybe                (fromJust)
-import           System.IO                 (hReady, stdin)
+import           System.IO                 (Handle, hClose, hFlush, hReady,
+                                            stdin)
+import           System.Process            (runInteractiveCommand,
+                                            waitForProcess)
 import           Text.Printf               (printf)
 
 import           Network.Simple.TCP        (HostPreference (Host), Socket,
                                             accept, connect, listen, recv,
                                             send)
+import qualified Network.WebSockets        as WS
+import qualified Network.WebSockets.Snap   as WS
 import           Numeric                   (readHex, showHex)
+import qualified Snap.Core                 as Snap
+import qualified Snap.Http.Server          as Snap
+import qualified Snap.Util.FileServe       as Snap
 
 import           Quoridor
 import           Quoridor.Cmdline.Messages (msgAwaitingTurn, msgGameEnd,
@@ -35,17 +48,17 @@ data ConnPlayer = ConnPlayer
 
 sendToSock :: (Show s, MonadIO m) => s -> Socket -> m ()
 sendToSock s sock = do
-    send sock $ B.pack $
-      printf "%04s" $ showHex (B.length serialized) ""
+    send sock $ BC.pack $
+      printf "%04s" $ showHex (BC.length serialized) ""
     send sock serialized
-  where serialized = B.pack $ show s
+  where serialized = BC.pack $ show s
 
 recvFromSock :: (Read r, MonadIO m) => Socket -> m r
 recvFromSock sock = do
   mHexSize <- recv sock 4
-  let ((size,_):_) = readHex $ B.unpack $ fromJust mHexSize
+  let ((size,_):_) = readHex $ BC.unpack $ fromJust mHexSize
   mValue <- recv sock size
-  return $ read $ B.unpack $ fromJust mValue
+  return $ read $ BC.unpack $ fromJust mValue
 
 
 
@@ -55,23 +68,25 @@ recvFromSock sock = do
 -- on the given port.
 -- This returns a Game monad which should be used with runGame.
 hostServer :: Int -> Game IO ()
-hostServer portStr = listen (Host "127.0.0.1") (show portStr) $
-  \(lstnSock, _) -> do
-    gc <- ask
-    let getPlayers 0 socks = do
-          let colors = map toEnum [0..]
-              getConnPlayers socks' = zipWith ConnPlayer socks' colors
-              connPs = getConnPlayers socks
-          mapM_ (\p -> sendToPlayer (gc, coplColor p) p) connPs
-          playServer connPs
-        getPlayers n socks = accept lstnSock $ \(connSock, _) -> do
-          let msg = "Connected. " ++ if n > 1
-                then "Waiting for other players."
-                else "Game begins."
-          liftIO $ putStrLn msg
-          sendToSock msg connSock
-          getPlayers (n-1) $ connSock : socks
-    getPlayers (numOfPlayers gc) []
+hostServer port = do
+  liftIO $ forkIO $ httpListen port
+  listen (Host "127.0.0.1") (show port) $
+    \(lstnSock, _) -> do
+      gc <- ask
+      let getPlayers 0 socks = do
+            let colors = map toEnum [0..]
+                getConnPlayers socks' = zipWith ConnPlayer socks' colors
+                connPs = getConnPlayers socks
+            mapM_ (\p -> sendToPlayer (gc, coplColor p) p) connPs
+            playServer connPs
+          getPlayers n socks = accept lstnSock $ \(connSock, _) -> do
+            let msg = "Connected. " ++ if n > 1
+                  then "Waiting for other players."
+                  else "Game begins."
+            liftIO $ putStrLn msg
+            sendToSock msg connSock
+            getPlayers (n-1) $ connSock : socks
+      getPlayers (numOfPlayers gc) []
 
 playServer :: [ConnPlayer] -> Game IO ()
 playServer connPs = play msgInitialTurn
@@ -109,14 +124,57 @@ sendToPlayer s cnp = sendToSock s $ coplSock cnp
 recvFromPlayer :: MonadIO m => ConnPlayer -> m String
 recvFromPlayer cnp = recvFromSock $ coplSock cnp
 
+httpListen :: Int -> IO ()
+httpListen = Snap.httpServe config . app
+  where
+    config = Snap.setErrorLog  Snap.ConfigNoLog $
+             Snap.setAccessLog Snap.ConfigNoLog
+             Snap.defaultConfig
+    app :: Int -> Snap.Snap ()
+    app port = Snap.route
+      [ ("",               Snap.ifTop $ Snap.serveFile "console.html")
+      , ("console.js",     Snap.serveFile "console.js")
+      , ("style.css",      Snap.serveFile "style.css")
+      , ("play", acceptWSPlayer port)
+      ]
 
+acceptWSPlayer :: Int -> Snap.Snap ()
+acceptWSPlayer port = WS.runWebSocketsSnap $ \pending ->
+  do
+    let cmd = "./quoridor-exec -j " ++ show port
+    (hIn, hOut, _, h) <- runInteractiveCommand cmd
+    conn <- WS.acceptRequest pending
+    _ <- forkIO $ copyHandleToConn hOut conn
+    _ <- forkIO $ copyConnToHandle conn hIn
+    _ <- waitForProcess h
+    return ()
+
+copyHandleToConn :: Handle -> WS.Connection -> IO ()
+copyHandleToConn h c = do
+  bs <- B.hGetSome h 1024
+  unless (B.null bs) $ do
+    putStrLn $ "> " ++ show bs
+    WS.sendTextData c bs
+    copyHandleToConn h c
+
+copyConnToHandle :: WS.Connection -> Handle -> IO ()
+copyConnToHandle c h = handle close $ forever $ do
+    bs <- WS.receiveData c
+    putStrLn $ "< " ++ show bs
+    B.hPutStr h bs
+    hFlush h
+  where
+    close e = case fromException e of
+      Just WS.ConnectionClosed -> hClose h
+      Just _                   -> hClose h
+      Nothing                  -> throw e
 
 -- Client
 
 -- | Given a port, joins a game server that listens
 -- on the given port.
 connectClient :: Int -> IO ()
-connectClient portStr = connect "127.0.0.1" (show portStr) $
+connectClient port = connect "127.0.0.1" (show port) $
   \(connSock, _) -> do
     msg <- recvFromSock connSock
     putStrLn msg
