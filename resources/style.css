@@ -1,0 +1,49 @@
+body {
+    margin: 18px;
+    font-family: 'Inconsolata', monospace;
+    font-size: 16px;
+    background-color: #444;
+}
+
+form {
+    color: #cfc;
+    font-family: 'Inconsolata', monospace;
+    font-size: 16px;
+    margin-top: 6px;
+}
+
+form input {
+    background-color: #444;
+    border: 1px solid #777;
+    color: #cfc;
+    font-family: 'Inconsolata', monospace;
+    font-size: 16px;
+    margin: 0px;
+    padding: 0px;
+}
+
+pre {
+    margin: 0px;
+    padding: 0px;
+    display: inline;
+}
+
+pre.stderr {
+    color: #fcc;
+}
+
+pre.stdout {
+    color: white;
+}
+
+pre.stdin {
+    color: #cfc;
+}
+
+font.Yellow { color: LemonChiffon; }
+font.Magenta { color: HotPink; }
+font.Cyan { color: LightSteelBlue; }
+font.White { color: white; }
+font.Blue { color: LightSkyBlue; }
+font.Red { color: IndianRed; }
+font.Green { color: GreenYellow; }

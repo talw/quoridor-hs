@@ -15,6 +15,11 @@ build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.19
 
+data-dir:            resources
+data-files:          console.html
+                     console.js
+                     style.css
+
 library
   hs-source-dirs:      src
   exposed-modules:     Quoridor
