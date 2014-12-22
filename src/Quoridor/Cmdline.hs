@@ -2,24 +2,26 @@ module Quoridor.Cmdline
   ( cmdlineMain
   ) where
 
-import           Control.Applicative       ((<$>))
-import           Control.Monad             (when)
-import           Control.Monad.Reader      (ask)
-import           Control.Monad.State       (MonadIO, get, liftIO)
-import           Data.List                 (sort)
-import           System.Environment        (getArgs)
-import           System.Exit               (exitSuccess)
+import           Control.Applicative             ((<$>))
+import           Control.Monad                   (when)
+import           Control.Monad.Reader            (ask)
+import           Control.Monad.State             (MonadIO, get, liftIO)
+import           Data.List                       (sort)
+import           System.Environment              (getArgs)
+import           System.Exit                     (exitSuccess)
 
-import           Network.Simple.TCP        (withSocketsDo)
+import           Network.Simple.TCP              (withSocketsDo)
 
 import           Quoridor
-import           Quoridor.Cmdline.Messages (msgGameEnd, msgInitialTurn,
-                                            msgInvalidTurn, msgValidTurn)
-import           Quoridor.Cmdline.Network  (connectClient, hostServer)
-import           Quoridor.Cmdline.Options  (ExecMode (..), Options (..),
-                                            getOptions)
-import           Quoridor.Cmdline.Parse    (parseTurn)
-import           Quoridor.Cmdline.Render   (putColoredStrTerm, runRenderColor)
+import           Quoridor.Cmdline.Messages       (msgGameEnd, msgInitialTurn,
+                                                  msgInvalidTurn, msgValidTurn)
+import           Quoridor.Cmdline.Network.Client (connectClient)
+import           Quoridor.Cmdline.Network.Server (hostServer)
+import           Quoridor.Cmdline.Options        (ExecMode (..), Options (..),
+                                                  getOptions)
+import           Quoridor.Cmdline.Parse          (parseTurn)
+import           Quoridor.Cmdline.Render         (putColoredStrTerm,
+                                                  runRenderColor)
 
 -- | The main entry point to quoridor-exec
 cmdlineMain :: IO ()

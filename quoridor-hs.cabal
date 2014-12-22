@@ -28,7 +28,9 @@ library
                        Quoridor.Cmdline.Render
                        Quoridor.Cmdline.Options
                        Quoridor.Cmdline.Messages
-                       Quoridor.Cmdline.Network
+                       Quoridor.Cmdline.Network.Server
+                       Quoridor.Cmdline.Network.Client
+                       Quoridor.Cmdline.Network.Common
                        Quoridor.Helpers
                        Paths_quoridor_hs
   -- other-extensions:
