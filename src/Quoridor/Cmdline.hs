@@ -9,7 +9,6 @@ import           Control.Monad.State       (MonadIO, get, liftIO)
 import           Data.List                 (sort)
 import           System.Environment        (getArgs)
 import           System.Exit               (exitSuccess)
-import           System.IO                 (hFlush, stdout)
 
 import           Network.Simple.TCP        (withSocketsDo)
 
@@ -20,7 +19,7 @@ import           Quoridor.Cmdline.Network  (connectClient, hostServer)
 import           Quoridor.Cmdline.Options  (ExecMode (..), Options (..),
                                             getOptions)
 import           Quoridor.Cmdline.Parse    (parseTurn)
-import           Quoridor.Cmdline.Render   (putColoredStrHtml, runRenderColor)
+import           Quoridor.Cmdline.Render   (putColoredStrTerm, runRenderColor)
 
 -- | The main entry point to quoridor-exec
 cmdlineMain :: IO ()
@@ -35,7 +34,8 @@ cmdlineMain = do
   case opExecMode opts of
     ExLocal -> runGame playLocal gc
     ExHost  -> withSocketsDo $ runGame (hostServer $ opHostListenPort opts) gc
-    ExJoin  -> withSocketsDo $ connectClient $ opHostListenPort opts
+    joinOrProxy  -> withSocketsDo $
+      connectClient (joinOrProxy == ExProxy) $ opHostListenPort opts
   exitSuccess
 
 -- playLocal used to be structured similarly to
@@ -54,7 +54,6 @@ playLocal = go True msgInitialTurn
 
           when showBoard renderCurrentBoard
           liftIO $ putStrLn msg
-          liftIO $ hFlush stdout
           handleWinOrTurn gs
             wonAction $
             handleParse (liftIO getLine) parseFailAct parseSuccAct
@@ -70,7 +69,7 @@ renderCurrentBoard = do
 -- playClient(handleWinOrTurn, wonAction, renderBoard) and playServer(handleParse)
 -- if I change playClient and playServer to be in the same vein as playLocal
 renderBoard :: GameState -> GameConfig -> [Cell] -> IO ()
-renderBoard gs gc vms = putColoredStrHtml $ runRenderColor gs gc vms
+renderBoard gs gc vms = putColoredStrTerm $ runRenderColor gs gc vms
 
 handleParse :: MonadIO m =>
   m String -> (String -> m ()) -> (Turn -> m ()) -> m ()

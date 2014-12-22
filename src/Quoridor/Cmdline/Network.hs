@@ -14,8 +14,9 @@ import qualified Data.ByteString           as B
 import qualified Data.ByteString.Char8     as BC
 import           Data.List                 (find)
 import           Data.Maybe                (fromJust)
+import           System.Directory          (getCurrentDirectory)
 import           System.IO                 (Handle, hClose, hFlush, hReady,
-                                            stdin)
+                                            stdin, stdout)
 import           System.Process            (runInteractiveCommand,
                                             waitForProcess)
 import           Text.Printf               (printf)
@@ -29,13 +30,16 @@ import           Numeric                   (readHex, showHex)
 import qualified Snap.Core                 as Snap
 import qualified Snap.Http.Server          as Snap
 import qualified Snap.Util.FileServe       as Snap
+import           System.FilePath           ((</>))
 
+import           Paths_quoridor_hs         (getDataDir)
 import           Quoridor
 import           Quoridor.Cmdline.Messages (msgAwaitingTurn, msgGameEnd,
                                             msgInitialTurn, msgInvalidTurn,
                                             msgValidTurn)
 import           Quoridor.Cmdline.Parse    (parseTurn)
-import           Quoridor.Cmdline.Render   (putColoredStrHtml, runRenderColor)
+import           Quoridor.Cmdline.Render   (putColoredStrHtml,
+                                            putColoredStrTerm, runRenderColor)
 
 
 
@@ -73,6 +77,7 @@ hostServer port = do
   listen (Host "127.0.0.1") (show port) $
     \(lstnSock, _) -> do
       gc <- ask
+
       let getPlayers 0 socks = do
             let colors = map toEnum [0..]
                 getConnPlayers socks' = zipWith ConnPlayer socks' colors
@@ -86,6 +91,7 @@ hostServer port = do
             liftIO $ putStrLn msg
             sendToSock msg connSock
             getPlayers (n-1) $ connSock : socks
+
       getPlayers (numOfPlayers gc) []
 
 playServer :: [ConnPlayer] -> Game IO ()
@@ -131,17 +137,21 @@ httpListen = Snap.httpServe config . app
              Snap.setAccessLog Snap.ConfigNoLog
              Snap.defaultConfig
     app :: Int -> Snap.Snap ()
-    app port = Snap.route
-      [ ("",               Snap.ifTop $ Snap.serveFile "console.html")
-      , ("console.js",     Snap.serveFile "console.js")
-      , ("style.css",      Snap.serveFile "style.css")
-      , ("play", acceptWSPlayer port)
-      ]
+    app port = do
+      dataDir <- liftIO getDataDir
+      Snap.route
+        [ ("",           Snap.ifTop $ Snap.serveFile $ dataDir </> "console.html")
+        , ("console.js", Snap.serveFile $ dataDir </> "console.js")
+        , ("style.css",  Snap.serveFile $ dataDir </> "style.css")
+        , ("play",       acceptWSPlayer port)
+        ]
 
 acceptWSPlayer :: Int -> Snap.Snap ()
 acceptWSPlayer port = WS.runWebSocketsSnap $ \pending ->
   do
-    let cmd = "./quoridor-exec -j " ++ show port
+    dir <- getCurrentDirectory
+    let cmd = dir </> "quoridor-exec -p " ++ show port
+    putStrLn cmd
     (hIn, hOut, _, h) <- runInteractiveCommand cmd
     conn <- WS.acceptRequest pending
     _ <- forkIO $ copyHandleToConn hOut conn
@@ -151,7 +161,7 @@ acceptWSPlayer port = WS.runWebSocketsSnap $ \pending ->
 
 copyHandleToConn :: Handle -> WS.Connection -> IO ()
 copyHandleToConn h c = do
-  bs <- B.hGetSome h 1024
+  bs <- B.hGetSome h 4096
   unless (B.null bs) $ do
     putStrLn $ "> " ++ show bs
     WS.sendTextData c bs
@@ -173,40 +183,50 @@ copyConnToHandle c h = handle close $ forever $ do
 
 -- | Given a port, joins a game server that listens
 -- on the given port.
-connectClient :: Int -> IO ()
-connectClient port = connect "127.0.0.1" (show port) $
+connectClient :: Bool -> Int -> IO ()
+connectClient isProxy port = connect "127.0.0.1" (show port) $
   \(connSock, _) -> do
     msg <- recvFromSock connSock
-    putStrLn msg
+    flushStrLn msg
     (gc, c) <- recvFromSock connSock
-    playClient connSock gc c
+    playClient connSock isProxy gc c
 
-playClient :: Socket -> GameConfig -> Color -> IO ()
-playClient connSock gc myColor = play
+playClient :: Socket -> Bool -> GameConfig -> Color -> IO ()
+playClient connSock isProxy gc myColor = play
   where
     play = do
       (gs, vm, msg) <- recvFromSock connSock
-      flushInput
-      putColoredStrHtml $ runRenderColor gs gc vm
-      putStrLn msg
+      emptyInput
+      (if isProxy then putColoredStrHtml else putColoredStrTerm) $
+        runRenderColor gs gc vm
+      flushStrLn msg
+      hFlush stdout
       case winner gs of
-        Just c  -> liftIO $ putStrLn $ msgGameEnd c
+        Just c  ->
+          flushStrLn $ msgGameEnd c
         Nothing -> do
           let currPC = color $ currP gs
           if currPC /= myColor
             then do
-              putStrLn $ msgAwaitingTurn currPC
+              flushStrLn $ msgAwaitingTurn currPC
               play
             else do
               strTurn <- liftIO getLine
               sendToSock strTurn connSock
               play
 
--- | This flushes command line input that was buffered while it wasn't the player's turn
--- Otherwise, garbage that was being fed to input while it wasn't the player's turn, will
--- be fed to the server and generate an error message per line, or even play a turn,
--- which may or may not be intentional.
-flushInput :: IO ()
-flushInput = do
+-- | Like putStrLn, but flushes right afterwards.
+flushStrLn :: String -> IO ()
+flushStrLn = (hFlush stdout <<) . putStrLn
+  where (<<) = flip (>>)
+
+-- | This empties command line input that was buffered
+-- while it wasn't the player's turn.
+-- Otherwise, garbage that was being fed to input
+-- while it wasn't the player's turn, will
+-- be fed to the server and generate an error message per line,
+-- or even play a turn, which may or may not be intentional.
+emptyInput :: IO ()
+emptyInput = do
   inputExists <- hReady stdin
-  when inputExists $ getLine >> flushInput
+  when inputExists $ getLine >> emptyInput

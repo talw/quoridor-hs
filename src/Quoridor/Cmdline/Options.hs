@@ -4,15 +4,16 @@ module Quoridor.Cmdline.Options
   , getOptions
   ) where
 
-import Control.Monad      (unless)
-import System.Environment (getProgName)
-import System.Exit        (exitFailure, exitSuccess)
+import           Control.Monad         (unless)
+import           System.Environment    (getProgName)
+import           System.Exit           (exitFailure, exitSuccess)
 
-import System.Console.GetOpt (ArgDescr (NoArg, OptArg), ArgDescr (ReqArg),
-                              ArgOrder (RequireOrder), OptDescr,
-                              OptDescr (Option), getOpt, usageInfo)
+import           System.Console.GetOpt (ArgDescr (NoArg, OptArg),
+                                        ArgDescr (ReqArg),
+                                        ArgOrder (RequireOrder), OptDescr,
+                                        OptDescr (Option), getOpt, usageInfo)
 
-import Quoridor.Helpers (andP)
+import           Quoridor.Helpers      (andP)
 
 -- | Represents possible options from the cmdline
 data Options = Options
@@ -25,7 +26,7 @@ data Options = Options
 
 -- | Represents an execution mode for the program.
 -- One can run quoridor at local play, server host or client join modes
-data ExecMode = ExLocal | ExHost | ExJoin
+data ExecMode = ExLocal | ExHost | ExJoin | ExProxy
   deriving Eq
 
 defaultOptions :: Options
@@ -96,24 +97,16 @@ options =
       "Start a local game"
 
   , Option "h" ["host"]
-      (OptArg
-          (\arg opts -> return opts
-                          { opExecMode = ExHost
-                          , opHostListenPort =
-                              maybe (opHostListenPort opts) read arg
-                          })
-          "PORT")
+      (portOptionArg ExHost)
       "Host a game server"
 
   , Option "j" ["join"]
-      (OptArg
-          (\arg opts -> return opts
-                          { opExecMode = ExJoin
-                          , opHostListenPort =
-                              maybe (opHostListenPort opts) read arg
-                          })
-          "PORT")
+      (portOptionArg ExJoin)
       "Join a game server"
+
+  , Option "p" ["client-proxy"]
+      (portOptionArg ExProxy)
+      "Client acts as proxy for a browser (used by the http server)"
 
   , Option "?" ["help"]
       (NoArg $
@@ -122,3 +115,12 @@ options =
             exitSuccess)
       "Show help"
   ]
+ where portOptionArg execMode =
+         OptArg
+             (\arg opts -> return opts
+                             { opExecMode = execMode
+                             , opHostListenPort =
+                                 maybe (opHostListenPort opts) read arg
+                             })
+             "PORT"
+
