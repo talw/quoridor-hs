@@ -6,6 +6,7 @@ module Quoridor.Cmdline.Network
   ) where
 
 import           Control.Concurrent        (forkIO)
+import           Control.Concurrent        (threadDelay)
 import           Control.Exception         (fromException, handle, throw)
 import           Control.Monad             (forever, unless, when)
 import           Control.Monad.Reader      (ask)
@@ -102,7 +103,7 @@ playServer connPs = play msgInitialTurn
       vm <- getCurrentValidMoves
       mapM_ (sendToPlayer (gs,vm,msg)) connPs
       case winner gs of
-        Just _  -> return ()
+        Just _  -> liftIO $ threadDelay $ 10*10^6
         Nothing -> do
           let currColor = color $ currP gs
               currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
