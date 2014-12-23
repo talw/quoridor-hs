@@ -75,6 +75,9 @@ putColoredStrTerm (str, colors) = mapM_ putColoredChar $ zip str colors
         colorToAction col =
           CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]
 
+-- | This is wasteful compared to having this logic in the browser's javascript.
+-- However this is still amounts to very little data being transferred, and that way
+-- I can avoid duplicating the coloring logic"
 putColoredStrHtml :: (String, [CA.Color]) -> IO ()
 putColoredStrHtml (str, colors) = putStr $ concatMap addColorProp $ zip str colors
   where addColorProp (ch, CA.White) = [ch]

@@ -4,6 +4,7 @@ module Quoridor.Cmdline.Network.Server
   ( hostServer
   ) where
 
+import           Control.Applicative             ((<$>))
 import           Control.Concurrent              (forkIO, threadDelay)
 import           Control.Exception               (fromException, handle, throw)
 import           Control.Monad                   (forever, unless)
@@ -12,6 +13,7 @@ import           Control.Monad.State             (MonadIO, get, liftIO)
 import qualified Data.ByteString                 as B
 import           Data.List                       (find)
 import           Data.Maybe                      (fromJust)
+import           Data.Maybe                      (fromMaybe)
 import           System.Directory                (getCurrentDirectory)
 import           System.IO                       (Handle, hClose, hFlush)
 import           System.Process                  (runInteractiveCommand,
@@ -66,7 +68,7 @@ playServer connPs = play msgInitialTurn
       vm <- getCurrentValidMoves
       mapM_ (sendToPlayer (gs,vm,msg)) connPs
       case winner gs of
-        Just _  -> liftIO $ threadDelay $ 10*10^6
+        Just _  -> liftIO $ threadDelay $ 10 * 1000 * 1000
         Nothing -> do
           let currColor = color $ currP gs
               currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
@@ -91,8 +93,9 @@ playServer connPs = play msgInitialTurn
 sendToPlayer :: (Show s, MonadIO m) => s -> ConnPlayer -> m ()
 sendToPlayer s cnp = sendToSock s $ coplSock cnp
 
-recvFromPlayer :: MonadIO m => ConnPlayer -> m String
-recvFromPlayer cnp = recvFromSock $ coplSock cnp
+recvFromPlayer :: (Functor m, MonadIO m) => ConnPlayer -> m String
+recvFromPlayer cnp = fromMaybe throwErr <$> recvFromSock (coplSock cnp)
+  where throwErr = error $ "Lost connection with " ++ show (coplColor cnp)
 
 httpListen :: Int -> IO ()
 httpListen = Snap.httpServe config . app
@@ -138,7 +141,6 @@ copyConnToHandle c h = handle close $ forever $ do
     B.hPutStr h bs
     hFlush h
   where
-    close e = case fromException e of
-      Just WS.ConnectionClosed -> hClose h
+    close e = case fromException e :: Maybe WS.ConnectionException of
       Just _                   -> hClose h
       Nothing                  -> throw e

@@ -2,8 +2,11 @@ module Quoridor.Cmdline.Network.Client
   ( connectClient
   ) where
 
+import           Control.Applicative             ((<$>))
 import           Control.Monad                   (when)
 import           Control.Monad.State             (liftIO)
+import           Control.Monad.State             (MonadIO)
+import           Data.Maybe                      (fromMaybe)
 import           System.IO                       (hFlush, hReady, stdin,
                                                   stdout)
 
@@ -22,16 +25,16 @@ import           Quoridor.Cmdline.Render         (putColoredStrHtml,
 connectClient :: Bool -> Int -> IO ()
 connectClient isProxy port = connect "127.0.0.1" (show port) $
   \(connSock, _) -> do
-    msg <- recvFromSock connSock
+    msg <- recvFromServer connSock
     flushStrLn msg
-    (gc, c) <- recvFromSock connSock
+    (gc, c) <- recvFromServer connSock
     playClient connSock isProxy gc c
 
 playClient :: Socket -> Bool -> GameConfig -> Color -> IO ()
 playClient connSock isProxy gc myColor = play
   where
     play = do
-      (gs, vm, msg) <- recvFromSock connSock
+      (gs, vm, msg) <- recvFromServer connSock
       emptyInput
       (if isProxy then putColoredStrHtml else putColoredStrTerm) $
         runRenderColor gs gc vm
@@ -50,6 +53,10 @@ playClient connSock isProxy gc myColor = play
               strTurn <- liftIO getLine
               sendToSock strTurn connSock
               play
+
+recvFromServer :: (Functor m, MonadIO m, Read r) => Socket -> m r
+recvFromServer sock = fromMaybe throwErr <$> recvFromSock sock
+  where throwErr = error "Lost connection with the server"
 
 -- | Like putStrLn, but flushes right afterwards.
 flushStrLn :: String -> IO ()
