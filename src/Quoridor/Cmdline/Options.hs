@@ -21,6 +21,7 @@ data Options = Options
   , opNumOfPlayers   :: Int
   , opGatesPerPlayer :: Int
   , opHostListenPort :: Int
+  , opHttpListenPort :: Int
   , opExecMode       :: ExecMode
   }
 
@@ -35,6 +36,7 @@ defaultOptions = Options
   , opNumOfPlayers   = 2
   , opGatesPerPlayer = 10
   , opHostListenPort = 33996
+  , opHttpListenPort = 33997
   , opExecMode       = ExLocal
   }
 
@@ -66,30 +68,26 @@ options =
   [ Option "b" ["board-size"]
       (ReqArg
           (\arg opts -> do
-            let argNum = read arg :: Int
-            unless (isInRange argNum 2 9) $ do
-              putUsageInfoLn
-              exitFailure
+            argNum <- rangedOption 2 9 arg
             return opts { opBoardSize = argNum })
           "INTEGER")
-      "Board size (2-9 rows/columns)"
+      "Board size (2-9 rows/columns). default 9"
 
   , Option "n" ["number-of-players"]
       (ReqArg
           (\arg opts -> do
-            let argNum = read arg
-            unless (isInRange argNum 2 4) $ do
-              putUsageInfoLn
-              exitFailure
+            argNum <- rangedOption 2 4 arg
             return opts { opNumOfPlayers = argNum })
           "INTEGER")
-      "Number of players (2-4 players)"
+      "Number of players (2-4 players). default 2"
 
   , Option "g" ["gates-per-player"]
       (ReqArg
-          (\arg opts -> return opts { opGatesPerPlayer = read arg })
+          (\arg opts -> do
+            argNum <- rangedOption 0 100 arg
+            return opts { opGatesPerPlayer = argNum })
           "INTEGER")
-      "Gates per player"
+      "Gates per player (1-100 gates per player). default 10"
 
   , Option "l" ["local"]
       (NoArg $
@@ -98,7 +96,7 @@ options =
 
   , Option "h" ["host"]
       (portOptionArg ExHost)
-      "Host a game server"
+      "Host a game server. default port 33997"
 
   , Option "j" ["join"]
       (portOptionArg ExJoin)
@@ -107,6 +105,14 @@ options =
   , Option "p" ["client-proxy"]
       (portOptionArg ExProxy)
       "Client acts as proxy for a browser (used by the http server)"
+
+  , Option "t" ["http-port"]
+      (ReqArg
+          (\arg opts -> do
+            argNum <- rangedOption 1025 65535 arg
+            return opts { opHttpListenPort = argNum })
+          "PORT")
+      "A port for the http-server (port 1025-65535), relevant only if --host flag is used. default 33997"
 
   , Option "?" ["help"]
       (NoArg $
@@ -117,10 +123,17 @@ options =
   ]
  where portOptionArg execMode =
          OptArg
-             (\arg opts -> return opts
-                             { opExecMode = execMode
-                             , opHostListenPort =
-                                 maybe (opHostListenPort opts) read arg
-                             })
-             "PORT"
-
+             (\arg opts -> do
+                argNum <- maybe (return $ opHostListenPort opts)
+                  (rangedOption 1025 65535) arg
+                return opts
+                  { opExecMode = execMode
+                  , opHostListenPort = argNum
+                  })
+              "PORT"
+       rangedOption x y arg = do
+         let argNum = read arg
+         unless (isInRange argNum x y) $ do
+           putUsageInfoLn
+           exitFailure
+         return argNum

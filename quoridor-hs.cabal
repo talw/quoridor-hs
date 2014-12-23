@@ -55,7 +55,7 @@ library
   -- hs-source-dirs:
   default-language:    Haskell2010
   GHC-Options:         -Wall
-                       -Werror
+                       ---Werror
                        -fno-warn-unused-do-bind
                        -fno-warn-type-defaults
 

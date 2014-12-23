@@ -12,8 +12,7 @@ import           Control.Monad.Reader            (ask)
 import           Control.Monad.State             (MonadIO, get, liftIO)
 import qualified Data.ByteString                 as B
 import           Data.List                       (find)
-import           Data.Maybe                      (fromJust)
-import           Data.Maybe                      (fromMaybe)
+import           Data.Maybe                      (fromJust, fromMaybe)
 import           System.Directory                (getCurrentDirectory)
 import           System.IO                       (Handle, hClose, hFlush)
 import           System.Process                  (runInteractiveCommand,
@@ -37,10 +36,10 @@ import           Quoridor.Cmdline.Parse          (parseTurn)
 -- | Given a port, hosts a game server that listens
 -- on the given port.
 -- This returns a Game monad which should be used with runGame.
-hostServer :: Int -> Game IO ()
-hostServer port = do
-  liftIO $ forkIO $ httpListen port
-  listen (Host "127.0.0.1") (show port) $
+hostServer :: Int -> Int -> Game IO ()
+hostServer quoriHostPort httpPort = do
+  liftIO $ forkIO $ httpListen quoriHostPort httpPort
+  listen (Host "127.0.0.1") (show quoriHostPort) $
     \(lstnSock, _) -> do
       gc <- ask
 
@@ -93,14 +92,18 @@ playServer connPs = play msgInitialTurn
 sendToPlayer :: (Show s, MonadIO m) => s -> ConnPlayer -> m ()
 sendToPlayer s cnp = sendToSock s $ coplSock cnp
 
+-- | The error message will appear only if the current player exits.
+-- To handle the case where other players will exit I'll have to rewrite the whole
+-- mechanism to be asynchronous between players.
 recvFromPlayer :: (Functor m, MonadIO m) => ConnPlayer -> m String
 recvFromPlayer cnp = fromMaybe throwErr <$> recvFromSock (coplSock cnp)
   where throwErr = error $ "Lost connection with " ++ show (coplColor cnp)
 
-httpListen :: Int -> IO ()
-httpListen = Snap.httpServe config . app
+httpListen :: Int -> Int -> IO ()
+httpListen quoriHostPort httpPort = Snap.httpServe config $ app quoriHostPort
   where
-    config = Snap.setErrorLog  Snap.ConfigNoLog $
+    config = Snap.setPort httpPort $
+             Snap.setErrorLog  Snap.ConfigNoLog $
              Snap.setAccessLog Snap.ConfigNoLog
              Snap.defaultConfig
     app :: Int -> Snap.Snap ()

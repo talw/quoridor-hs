@@ -35,7 +35,8 @@ cmdlineMain = do
           }
   case opExecMode opts of
     ExLocal -> runGame playLocal gc
-    ExHost  -> withSocketsDo $ runGame (hostServer $ opHostListenPort opts) gc
+    ExHost  -> withSocketsDo $ runGame
+      (hostServer (opHostListenPort opts) (opHttpListenPort opts)) gc
     joinOrProxy  -> withSocketsDo $
       connectClient (joinOrProxy == ExProxy) $ opHostListenPort opts
   exitSuccess
