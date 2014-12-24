@@ -9,38 +9,30 @@ function appendChar(c) {
 }
 
 $(document).ready(function () {
-    var ws;
+    var port = window.location.port
+    var hostName = window.location.hostname;
+    var uri = "ws://"+hostName+":"+port+"/play"
 
-    $('#port').focus();
+    var ws = new WebSocket(uri);
+    appendOutput('stderr', 'Opening WebSockets connection...\n');
 
-    $('#login').submit(function () {
-        $('#login').css('display', 'none');
-        $('#console').css('display', 'block');
+    ws.onerror = function(event) {
+        appendOutput('stderr', 'WebSockets error: ' + event.data + '\n');
+    };
 
-        var port = $('#port').val();
-        var hostName = window.location.hostname;
-        var uri = "ws://"+hostName+":"+port+"/play"
-        ws = new WebSocket(uri);
-        appendOutput('stderr', 'Opening WebSockets connection...\n');
+    ws.onopen = function() {
+        appendOutput('stderr', 'WebSockets connection successful!\n');
+    };
 
-        ws.onerror = function(event) {
-            appendOutput('stderr', 'WebSockets error: ' + event.data + '\n');
-        };
+    ws.onclose = function() {
+        appendOutput('stderr', 'WebSockets connection closed.\n');
+    };
 
-        ws.onopen = function() {
-            appendOutput('stderr', 'WebSockets connection successful!\n');
-        };
+    ws.onmessage = function(event) {
+        appendOutput('stdout', event.data);
+    };
 
-        ws.onclose = function() {
-            appendOutput('stderr', 'WebSockets connection closed.\n');
-        };
-
-        ws.onmessage = function(event) {
-            appendOutput('stdout', event.data);
-        };
-
-        return false;
-    });
+    return false;
 
     $('#console-input').submit(function () {
         var line = $('#line').val();
