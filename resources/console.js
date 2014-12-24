@@ -4,16 +4,12 @@ function appendOutput(cls, text) {
     $('#line')[0].scrollIntoView({block: "end", behavior: "instant"});
 }
 
-function appendChar(c) {
-
-}
-
 $(document).ready(function () {
     var port = window.location.port
     var hostName = window.location.hostname;
     var uri = "ws://"+hostName+":"+port+"/play"
-
     var ws = new WebSocket(uri);
+
     appendOutput('stderr', 'Opening WebSockets connection...\n');
 
     ws.onerror = function(event) {
@@ -31,8 +27,6 @@ $(document).ready(function () {
     ws.onmessage = function(event) {
         appendOutput('stdout', event.data);
     };
-
-    return false;
 
     $('#console-input').submit(function () {
         var line = $('#line').val();
