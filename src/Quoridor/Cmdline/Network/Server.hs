@@ -133,17 +133,24 @@ copyHandleToConn :: Handle -> WS.Connection -> IO ()
 copyHandleToConn h c = do
   bs <- B.hGetSome h 4096
   unless (B.null bs) $ do
-    putStrLn $ "> " ++ show bs
+    putStrLn $ previewStr $ "WS > " ++ show bs
     WS.sendTextData c bs
     copyHandleToConn h c
+ where
 
 copyConnToHandle :: WS.Connection -> Handle -> IO ()
 copyConnToHandle c h = handle close $ forever $ do
-    bs <- WS.receiveData c
-    putStrLn $ "< " ++ show bs
-    B.hPutStr h bs
-    hFlush h
-  where
-    close e = case fromException e :: Maybe WS.ConnectionException of
-      Just _                   -> hClose h
-      Nothing                  -> throw e
+  bs <- WS.receiveData c
+  putStrLn $ previewStr $ "WS < " ++ show bs
+  B.hPutStr h bs
+  hFlush h
+ where
+  close e = case fromException e :: Maybe WS.ConnectionException of
+    Just _                   -> hClose h
+    Nothing                  -> throw e
+
+previewStr :: String -> String
+previewStr str = prvw ++ if not $ null rst then "....."
+                                        else ""
+ where (prvw, rst) = splitAt 80 str
+
