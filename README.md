@@ -43,6 +43,8 @@ dist/build/quoridor-exec/ where you 'cabal install'ed.
     - [ ] Should add tests for render module and parsing module
     - [ ] Should try adding some QuickCheck tests, to try it.
     - [ ] Should use lens to manipulate and access GameState, to try it.
+    - [ ] Add another distribution package without the http-server.
+      It makes for a much smaller package for those not interested in that feature.
     - [x] Will have to move to a method where you calculate valid positions
       instead of getting a position and checking if it's valid.
       It will fix some edge cases.
