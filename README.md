@@ -1,11 +1,17 @@
 # quoridor-hs
 
-An implementation in Haskell of the 2-to-4-player strategy game
+An implementation in Haskell of the 2-to-4-player strategy game.
 
 Here's a description of the game's rules:
 http://en.wikipedia.org/wiki/Quoridor#Rules_of_the_game
 
 Work in progress.
+Currently supports local or multiplayer over TCP.
+Client is either CLI or a browser page which is hooked to a client CLI process 
+on the server (i.e. complete reuse of the CLI interface for the browser page).
+Browser page is served via http server that the executable runs if run with --host flag
+
+
 
 ### Install
 I'm holding out on uploading this to Hackage,
@@ -26,22 +32,26 @@ dist/build/quoridor-exec/ where you 'cabal install'ed.
 
 ### TODO
 - Features
-    - Competent AI
-    - A web application
-- Features (DONE)
-    - A CLI interface (cli interface is yet unpolished)
-    - Online multiplayer
+    - [ ] Competent AI
+    - [x] A CLI interface
+    - [x] Online multiplayer
+    - [x] A browser interface
 - Issues
-- Issues (DONE)
-    - DONE - Will have to move to a method where you calculate valid positions
+    - [ ] Should handle gracefully, the case where a player disconnects
+      not during midgame, but during waiting for the rest of the players
+      to connect.
+    - [ ] Should add tests for render module and parsing module
+    - [ ] Should try adding some QuickCheck tests, to try it.
+    - [ ] Should use lens to manipulate and access GameState, to try it.
+    - [x] Will have to move to a method where you calculate valid positions
       instead of getting a position and checking if it's valid.
       It will fix some edge cases.
-    - DONE - Consider changing the rendering functions to return strings without
+    - [x] Consider changing the rendering functions to return strings without
       causing IO. In which case use an efficient data structure to support
       the concatenations (difference lists?)
-    - DONE - Consider adding some of the static configuration variables, like
+    - [x] Consider adding some of the static configuration variables, like
       board size to a data type and using the ReaderT monad inside Game
-    - DONE - dfs's visited list is made up for each sub traversal, instead of
+    - [x] DFS's visited list is made up for each sub traversal, instead of
       there being just a universal one. Might be able to be solved by
       sequencing the recursion with a state monad of the visited cells.
       Avoid pre-optimization though. Wait for profiling results
