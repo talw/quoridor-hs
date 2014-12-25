@@ -7,7 +7,7 @@ module Quoridor.Cmdline.Network.Server
 import           Control.Applicative             ((<$>))
 import           Control.Concurrent              (forkIO, threadDelay)
 import           Control.Exception               (fromException, handle, throw)
-import           Control.Monad                   (forever, unless)
+import           Control.Monad                   (forever, unless, (>=>))
 import           Control.Monad.Reader            (ask)
 import           Control.Monad.State             (MonadIO, get, liftIO)
 import qualified Data.ByteString                 as B
@@ -72,20 +72,16 @@ playServer connPs = play msgInitialTurn
           let currColor = color $ currP gs
               currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
               sendToCurrPlayer x = sendToPlayer x currConnP
+
               execValidTurn = do
                 strTurn <- recvFromPlayer currConnP
-                let eTurn = parseTurn strTurn
-                case eTurn of
-                  Left invalidParseMsg -> do
-                    sendToCurrPlayer (gs,invalidParseMsg)
-                    execValidTurn
-                  Right turn -> do
-                    wasValid <- makeTurn turn
-                    if wasValid
-                      then return turn
-                      else do
-                        sendToCurrPlayer (gs, msgInvalidTurn)
-                        execValidTurn
+                let reAskForInput msg' = do sendToCurrPlayer (gs,vm,msg')
+                                            execValidTurn
+                either reAskForInput
+                       (makeTurn >=> maybe (reAskForInput msgInvalidTurn)
+                                           return)
+                       $ parseTurn strTurn
+
           turn <- execValidTurn
           play $ msgValidTurn currColor turn
 

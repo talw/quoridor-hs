@@ -5,7 +5,7 @@ module Quoridor.Cmdline
 import           Control.Applicative             ((<$>))
 import           Control.Monad                   (when)
 import           Control.Monad.Reader            (ask)
-import           Control.Monad.State             (MonadIO, get, liftIO)
+import           Control.Monad.State             (MonadIO, get, gets, liftIO)
 import           Data.List                       (sort)
 import           System.Environment              (getArgs)
 import           System.Exit                     (exitSuccess)
@@ -50,14 +50,14 @@ playLocal = go True msgInitialTurn
   where go showBoard msg = do
           gs <- get
           let parseFailAct = go False
-              parseSuccAct turn = do wasValid <- makeTurn turn
-                                     go True $ if wasValid
-                                       then msgValidTurn (color $ currP gs) turn
-                                       else msgInvalidTurn
-
+              parseSuccAct turn = do
+                mTurn <- makeTurn turn
+                go True $ maybe msgInvalidTurn
+                                (msgValidTurn (color $ currP gs))
+                                mTurn
           when showBoard renderCurrentBoard
           liftIO $ putStrLn msg
-          handleWinOrTurn gs
+          handleWinOrTurn
             wonAction $
             handleParse (liftIO getLine) parseFailAct parseSuccAct
 
@@ -76,17 +76,12 @@ renderBoard gs gc vms = putColoredStrTerm $ runRenderColor gs gc vms
 
 handleParse :: MonadIO m =>
   m String -> (String -> m ()) -> (Turn -> m ()) -> m ()
-handleParse strAct failAct succAct = do
-  strTurn <- strAct
-  case parseTurn strTurn of
-    Left msg   -> failAct msg
-    Right turn -> succAct turn
+handleParse getStrAct failAct succAct =
+  (either failAct succAct . parseTurn) =<< getStrAct
 
-handleWinOrTurn :: MonadIO m => GameState -> (Color -> m ()) -> m () -> m ()
-handleWinOrTurn gs wonAct contAct =
-  case winner gs of
-    Just c  -> wonAct c
-    Nothing -> contAct
+handleWinOrTurn :: MonadIO m => (Color -> Game m ()) -> Game m () -> Game m ()
+handleWinOrTurn wonAct contAct =
+  maybe contAct wonAct =<< gets winner
 
 wonAction :: MonadIO m => Color -> m ()
 wonAction = liftIO . putStrLn . msgGameEnd

@@ -3,7 +3,7 @@ module Main
  ) where
 
 import           Data.List  (find, sort)
-import           Data.Maybe (fromJust)
+import           Data.Maybe (fromJust, isJust, isNothing)
 
 import           Test.HUnit
 
@@ -113,16 +113,16 @@ accumulateTests =
 
   , testCase "makeTurn-move-valid" $ do
       let gs = someGameState
-      (succeed, gs') <- runGameTest (makeTurn $ Move (4,4)) gs
-      True @=? succeed
+      (mTurn, gs') <- runGameTest (makeTurn $ Move (4,4)) gs
+      True @=? isJust mTurn
       let p' = last $ playerList gs'
       color (currP gs) @=? color p'
       (4,4) @=? pos p'
 
   , testCase "makeTurn-move-invalid" $ do
       let gs = someGameState
-      (succeed, gs') <- runGameTest (makeTurn $ Move  (3,5)) gs
-      False @=? succeed
+      (mTurn, gs') <- runGameTest (makeTurn $ Move  (3,5)) gs
+      True @=? isNothing mTurn
       color (currP gs) @=? color (currP gs')
       (3,3) @=? pos (currP gs')
 
@@ -130,8 +130,8 @@ accumulateTests =
       let gs = someGameState
           ggs = halfGates gs
           gateToInsert = gateUpperLeft (3,3) V
-      (succeed, gs') <- runGameTest (makeTurn $ PutGate gateToInsert) gs
-      True @=? succeed
+      (mTurn, gs') <- runGameTest (makeTurn $ PutGate gateToInsert) gs
+      True @=? isJust mTurn
       insertGate gateToInsert ggs @=? halfGates gs'
 
   , testCase "checkAndSetWinner-nothing" $

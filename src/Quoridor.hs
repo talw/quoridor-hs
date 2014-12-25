@@ -309,15 +309,16 @@ checkAndSetWinner = do
 -- whether or not a valid turn was requested.
 -- If an invalid turn was requested, it can be safely assumed
 -- that the GameState did not change.
-makeTurn :: (Monad m, Functor m) => Turn -> Game m Bool
+makeTurn :: (Monad m, Functor m) => Turn -> Game m (Maybe Turn)
 makeTurn t = do
   t' <- coerceTurn t
-  valid <- isValidTurn t'
-  when valid $ do
-    actTurn t'
-    checkAndSetWinner
-    changeCurrPlayer
-  return valid
+  wasValid <- isValidTurn t'
+  if wasValid
+    then do actTurn t'
+            checkAndSetWinner
+            changeCurrPlayer
+            return $ Just t'
+    else return Nothing
 
 -- | A Game monad wrapper for the unmonadic 'getValidMoves'
 getCurrentValidMoves :: Monad m => Game m [Cell]
