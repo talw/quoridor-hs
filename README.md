@@ -40,6 +40,11 @@ dist/build/quoridor-exec/ where you 'cabal install'ed.
     - [ ] Should handle gracefully, the case where a player disconnects
       not during midgame, but during waiting for the rest of the players
       to connect.
+        - [ ] For that, first the protocol needs to change.
+          In addition to the first 4 bits indicating the size of the msg,
+          2 more bits will be used to indicate the type of message.
+          Will be used to be able to send arbitrary amount of messages to waiting clients,
+          using that to test for the 'resource vanished' exception.
     - [ ] Should add tests for render module and parsing module
     - [ ] Should try adding some QuickCheck tests, to try it.
     - [ ] Should use lens to manipulate and access GameState, to try it.
