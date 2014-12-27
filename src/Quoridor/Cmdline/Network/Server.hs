@@ -5,21 +5,29 @@ module Quoridor.Cmdline.Network.Server
   ) where
 
 import           Control.Applicative             ((<$>))
-import           Control.Concurrent              (forkIO, threadDelay)
-import           Control.Exception               (fromException, handle, throw)
-import           Control.Monad                   (forever, unless, (>=>))
+import           Control.Concurrent              (ThreadId, forkIO, killThread,
+                                                  myThreadId, threadDelay,
+                                                  throwTo)
+import           Control.Exception               (bracket, fromException,
+                                                  handle, throw)
+import           Control.Monad                   (filterM, forever, unless,
+                                                  (>=>))
 import           Control.Monad.Reader            (ask)
 import           Control.Monad.State             (MonadIO, get, liftIO)
 import qualified Data.ByteString                 as B
 import           Data.List                       (find)
 import           Data.Maybe                      (fromJust, fromMaybe)
+import           Debug.Trace
 import           System.Directory                (getCurrentDirectory)
 import           System.IO                       (Handle, hClose, hFlush)
-import           System.Process                  (runInteractiveCommand,
+import           System.Process                  (ProcessHandle,
+                                                  runInteractiveCommand,
+                                                  terminateProcess,
                                                   waitForProcess)
 
 import           Network.Simple.TCP              (HostPreference (Host),
                                                   accept, listen)
+import           Network.Socket                  (isReadable)
 import qualified Network.WebSockets              as WS
 import qualified Network.WebSockets.Snap         as WS
 import qualified Snap.Core                       as Snap
@@ -44,15 +52,20 @@ hostServer quoriHostPort httpPort = do
       gc <- ask
 
       let getPlayers 0 socks = do
-            let colors = map toEnum [0..]
-                getConnPlayers socks' = zipWith ConnPlayer socks' colors
-                connPs = getConnPlayers socks
-            mapM_ (\p -> sendToPlayer (gc, coplColor p) p) connPs
-            playServer connPs
+            coSocks <- liftIO $ filterM isAliveSock socks
+            if length coSocks /= length socks
+              then getPlayers (length socks - length coSocks) coSocks
+              else do
+                let colors = map toEnum [0..]
+                    connPs = zipWith ConnPlayer socks colors
+                    {-getConnPlayers socks' = zipWith ConnPlayer socks' colors-}
+                    {-connPs = getConnPlayers socks-}
+                mapM_ (\p -> sendToPlayer (gc, coplColor p) p) connPs
+                playServer connPs
+
           getPlayers n socks = accept lstnSock $ \(connSock, _) -> do
             let msg = "Connected. " ++ if n > 1
-                  then "Waiting for other players."
-                  else "Game begins."
+                  then "Waiting for other players." else ""
             liftIO $ putStrLn msg
             sendToSock msg connSock
             getPlayers (n-1) $ connSock : socks
@@ -118,11 +131,23 @@ acceptWSPlayer port = WS.runWebSocketsSnap $ \pending ->
     dir <- getCurrentDirectory
     let cmd = dir </> "quoridor-exec -p " ++ show port
     putStrLn cmd
-    (hIn, hOut, _, h) <- runInteractiveCommand cmd
-    conn <- WS.acceptRequest pending
-    _ <- forkIO $ copyHandleToConn hOut conn
-    _ <- forkIO $ copyConnToHandle conn hIn
-    _ <- waitForProcess h
+
+    let acqRsrc = do
+          (hIn, hOut, _, ph) <- runInteractiveCommand cmd
+          conn <- WS.acceptRequest pending
+          outT <- forkIO $ copyHandleToConn hOut conn
+          tId <- myThreadId
+          inT <- forkIO $ copyConnToHandle conn hIn tId
+          return (hIn, hOut, ph, inT, outT)
+        freeRsrc (hIn, hOut, ph, inT, outT) = do
+          killThread inT
+          killThread outT
+          hClose hIn
+          hClose hOut
+          terminateProcess ph
+    bracket acqRsrc freeRsrc $
+      \(_,_,ph,_,_) -> waitForProcess ph
+
     return ()
 
 copyHandleToConn :: Handle -> WS.Connection -> IO ()
@@ -134,16 +159,17 @@ copyHandleToConn h c = do
     copyHandleToConn h c
  where
 
-copyConnToHandle :: WS.Connection -> Handle -> IO ()
-copyConnToHandle c h = handle close $ forever $ do
+copyConnToHandle :: WS.Connection -> Handle -> ThreadId -> IO ()
+copyConnToHandle c h t = handle thrower $ forever $ do
   bs <- WS.receiveData c
   putStrLn $ previewStr $ "WS < " ++ show bs
   B.hPutStr h bs
   hFlush h
  where
-  close e = case fromException e :: Maybe WS.ConnectionException of
-    Just _                   -> hClose h
-    Nothing                  -> throw e
+  thrower e = throwTo t (e :: WS.ConnectionException)
+  {-close e = case fromException e :: Maybe WS.ConnectionException of-}
+    {-Just _                   -> traceIO "terminating process. " >> terminateProcess ph-}
+    {-Nothing                  -> traceIO "rethrowing. " >> throw e-}
 
 previewStr :: String -> String
 previewStr str = prvw ++ if not $ null rst then "....."

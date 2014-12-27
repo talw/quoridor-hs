@@ -7,7 +7,7 @@ http://en.wikipedia.org/wiki/Quoridor#Rules_of_the_game
 
 Work in progress.
 Currently supports local or multiplayer over TCP.
-Client is either CLI or a browser page which is hooked to a client CLI process 
+Client is either CLI or a browser page which is hooked to a client CLI process
 on the server (i.e. complete reuse of the CLI interface for the browser page).
 Browser page is served via http server that the executable runs if run with --host flag
 
@@ -37,14 +37,14 @@ dist/build/quoridor-exec/ where you 'cabal install'ed.
     - [x] Online multiplayer
     - [x] A browser interface
 - Issues
-    - [ ] Should handle gracefully, the case where a player disconnects
+    - [x] Should handle the case where a player disconnects
       not during midgame, but during waiting for the rest of the players
       to connect.
-        - [ ] For that, first the protocol needs to change.
-          In addition to the first 4 bits indicating the size of the msg,
-          2 more bits will be used to indicate the type of message.
-          Will be used to be able to send arbitrary amount of messages to waiting clients,
-          using that to test for the 'resource vanished' exception.
+        - [x] For that, a function that sends a dummy message
+          should be made. And using that function to test if
+          the socket is alive.
+          (Socket's IsConnected and IsReadable still return true
+          even when the socket is dead)
     - [ ] Should add tests for render module and parsing module
     - [ ] Should try adding some QuickCheck tests, to try it.
     - [ ] Should use lens to manipulate and access GameState, to try it.
