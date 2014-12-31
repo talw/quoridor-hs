@@ -8,8 +8,7 @@ import           Control.Applicative             ((<$>))
 import           Control.Concurrent              (ThreadId, forkIO, killThread,
                                                   myThreadId, threadDelay,
                                                   throwTo)
-import           Control.Exception               (bracket, fromException,
-                                                  handle, throw)
+import           Control.Exception               (bracket, handle)
 import           Control.Monad                   (filterM, forever, unless,
                                                   (>=>))
 import           Control.Monad.Reader            (ask)
@@ -17,17 +16,14 @@ import           Control.Monad.State             (MonadIO, get, liftIO)
 import qualified Data.ByteString                 as B
 import           Data.List                       (find)
 import           Data.Maybe                      (fromJust, fromMaybe)
-import           Debug.Trace
 import           System.Directory                (getCurrentDirectory)
 import           System.IO                       (Handle, hClose, hFlush)
-import           System.Process                  (ProcessHandle,
-                                                  runInteractiveCommand,
+import           System.Process                  (runInteractiveCommand,
                                                   terminateProcess,
                                                   waitForProcess)
 
 import           Network.Simple.TCP              (HostPreference (Host),
                                                   accept, listen)
-import           Network.Socket                  (isReadable)
 import qualified Network.WebSockets              as WS
 import qualified Network.WebSockets.Snap         as WS
 import qualified Snap.Core                       as Snap
@@ -167,9 +163,6 @@ copyConnToHandle c h t = handle thrower $ forever $ do
   hFlush h
  where
   thrower e = throwTo t (e :: WS.ConnectionException)
-  {-close e = case fromException e :: Maybe WS.ConnectionException of-}
-    {-Just _                   -> traceIO "terminating process. " >> terminateProcess ph-}
-    {-Nothing                  -> traceIO "rethrowing. " >> throw e-}
 
 previewStr :: String -> String
 previewStr str = prvw ++ if not $ null rst then "....."
