@@ -73,7 +73,7 @@ test-suite quoridor-tests
   hs-source-dirs:      tests
   main-is:             Tests.hs
   build-depends:       base >=4.7 && <4.8,
-                       HUnit,
+                       HUnit ==1.2.*,
                        quoridor-hs,
                        mtl >=2.1 && <2.2
   default-language:    Haskell2010
