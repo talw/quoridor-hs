@@ -51,7 +51,8 @@ library
                        snap-server ==0.9.*,
                        filepath ==1.3.*,
                        directory ==1.2.*,
-                       network ==2.5.*
+                       network ==2.5.*,
+                       async ==2.0.*
 
   -- hs-source-dirs:
   default-language:    Haskell2010

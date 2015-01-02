@@ -9,7 +9,7 @@ import           Control.Monad.Reader (MonadReader, ReaderT, reader,
                                        runReaderT)
 import           Control.Monad.State  (MonadIO, MonadState, MonadTrans, StateT,
                                        evalState, get, gets, lift, modify, put,
-                                       runStateT, void, when)
+                                       runStateT, void)
 import           Data.List            (find, sort)
 import qualified Data.Map             as M
 import qualified Data.Set             as S

@@ -5,10 +5,8 @@ module Quoridor.Cmdline.Network.Server
   ) where
 
 import           Control.Applicative             ((<$>))
-import           Control.Concurrent              (ThreadId, forkIO, killThread,
-                                                  myThreadId, threadDelay,
-                                                  throwTo)
-import           Control.Exception               (bracket, handle)
+import           Control.Concurrent              (forkIO, threadDelay)
+import           Control.Exception               (bracket)
 import           Control.Monad                   (filterM, forever, unless,
                                                   (>=>))
 import           Control.Monad.Reader            (ask)
@@ -19,9 +17,9 @@ import           Data.Maybe                      (fromJust, fromMaybe)
 import           System.Directory                (getCurrentDirectory)
 import           System.IO                       (Handle, hClose, hFlush)
 import           System.Process                  (runInteractiveCommand,
-                                                  terminateProcess,
-                                                  waitForProcess)
+                                                  terminateProcess)
 
+import           Control.Concurrent.Async        (async, cancel, waitAny)
 import           Network.Simple.TCP              (HostPreference (Host),
                                                   accept, listen)
 import qualified Network.WebSockets              as WS
@@ -131,18 +129,22 @@ acceptWSPlayer port = WS.runWebSocketsSnap $ \pending ->
     let acqRsrc = do
           (hIn, hOut, _, ph) <- runInteractiveCommand cmd
           conn <- WS.acceptRequest pending
-          outT <- forkIO $ copyHandleToConn hOut conn
-          tId <- myThreadId
-          inT <- forkIO $ copyConnToHandle conn hIn tId
-          return (hIn, hOut, ph, inT, outT)
-        freeRsrc (hIn, hOut, ph, inT, outT) = do
-          killThread inT
-          killThread outT
+          outAsync <- async $ copyHandleToConn hOut conn
+          inAsync <- async $ copyConnToHandle conn hIn
+          return (hIn, hOut, ph, inAsync, outAsync)
+        freeRsrc (hIn, hOut, ph, inAsync, outAsync) = do
+          -- In case of an exception, we don't know if it's
+          -- the inAsync or the outAsync (depends on if game ended
+          -- with a player disconnecting, or somebody winning)
+          -- so to make sure the other thread stops running as well,
+          -- we just kill both (killing a dead thread is a noOp).
+          cancel outAsync
+          cancel inAsync
           hClose hIn
           hClose hOut
           terminateProcess ph
     bracket acqRsrc freeRsrc $
-      \(_,_,ph,_,_) -> waitForProcess ph
+      \(_,_,_,inAsync,outAsync) -> waitAny [inAsync, outAsync]
 
     return ()
 
@@ -155,14 +157,12 @@ copyHandleToConn h c = do
     copyHandleToConn h c
  where
 
-copyConnToHandle :: WS.Connection -> Handle -> ThreadId -> IO ()
-copyConnToHandle c h t = handle thrower $ forever $ do
+copyConnToHandle :: WS.Connection -> Handle -> IO ()
+copyConnToHandle c h = forever $ do
   bs <- WS.receiveData c
   putStrLn $ previewStr $ "WS < " ++ show bs
   B.hPutStr h bs
   hFlush h
- where
-  thrower e = throwTo t (e :: WS.ConnectionException)
 
 previewStr :: String -> String
 previewStr str = prvw ++ if not $ null rst then "....."
