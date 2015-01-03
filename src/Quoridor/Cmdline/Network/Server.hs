@@ -19,7 +19,7 @@ import           System.IO                       (Handle, hClose, hFlush)
 import           System.Process                  (runInteractiveCommand,
                                                   terminateProcess)
 
-import           Control.Concurrent.Async        (async, cancel, waitAny)
+import           Control.Concurrent.Async        (race)
 import           Network.Simple.TCP              (HostPreference (Host),
                                                   accept, listen)
 import qualified Network.WebSockets              as WS
@@ -129,22 +129,13 @@ acceptWSPlayer port = WS.runWebSocketsSnap $ \pending ->
     let acqRsrc = do
           (hIn, hOut, _, ph) <- runInteractiveCommand cmd
           conn <- WS.acceptRequest pending
-          outAsync <- async $ copyHandleToConn hOut conn
-          inAsync <- async $ copyConnToHandle conn hIn
-          return (hIn, hOut, ph, inAsync, outAsync)
-        freeRsrc (hIn, hOut, ph, inAsync, outAsync) = do
-          -- In case of an exception, we don't know if it's
-          -- the inAsync or the outAsync (depends on if game ended
-          -- with a player disconnecting, or somebody winning)
-          -- so to make sure the other thread stops running as well,
-          -- we just kill both (killing a dead thread is a noOp).
-          cancel outAsync
-          cancel inAsync
+          return (hIn, hOut, ph, conn)
+        freeRsrc (hIn, hOut, ph, conn) = do
           hClose hIn
           hClose hOut
           terminateProcess ph
     bracket acqRsrc freeRsrc $
-      \(_,_,_,inAsync,outAsync) -> waitAny [inAsync, outAsync]
+      \(hIn,hOut,_,conn) -> race (copyHandleToConn hOut conn) (copyConnToHandle conn hIn)
 
     return ()
 
