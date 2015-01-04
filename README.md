@@ -45,6 +45,14 @@ dist/build/quoridor-exec/ where you 'cabal install'ed.
           the socket is alive.
           (Socket's IsConnected and IsReadable still return true
           even when the socket is dead)
+    - [ ] Should add a chat window
+        - [ ] Should recode the server so as to handle clients concurrently, rather than with one thread
+              which will enable the addition of a chat window.
+            - [ ] Will require changing the cli client to use a lib (ncurses?) to modify the terminal buffer, instead of
+                  just printing more output
+            - [ ] The browser interface can still use the the older cli which outputs everything, but that older cli should
+                  be modified that in browser proxy mode it also outputs the chat window updates, with some tag so that
+                  it could be distinguished in javascript and displayed in a separate control.
     - [ ] Should add tests for render module and parsing module
     - [ ] Should try adding some QuickCheck tests, to try it.
     - [ ] Should use lens to manipulate and access GameState, to try it.
