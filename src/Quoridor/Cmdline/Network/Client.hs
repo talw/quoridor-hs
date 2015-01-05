@@ -4,8 +4,7 @@ module Quoridor.Cmdline.Network.Client
 
 import           Control.Applicative             ((<$>))
 import           Control.Monad                   (when)
-import           Control.Monad.State             (liftIO)
-import           Control.Monad.State             (MonadIO)
+import           Control.Monad.State             (MonadIO, liftIO)
 import           Data.Maybe                      (fromMaybe)
 import           System.IO                       (hFlush, hReady, stdin,
                                                   stdout)
@@ -22,9 +21,10 @@ import           Quoridor.Cmdline.Render         (putColoredStrHtml,
 
 -- | Given a port, joins a game server that listens
 -- on the given port.
-connectClient :: Bool -> Int -> IO ()
-connectClient isProxy port = connect "127.0.0.1" (show port) $
+connectClient :: Bool -> String -> Int -> IO ()
+connectClient isProxy addr port = connect addr (show port) $
   \(connSock, _) -> do
+    putStrLn $ "Connecting to " ++ addr ++ ":" ++ show port
     msg <- recvFromServer connSock
     flushStrLn msg
     (gc, c) <- recvFromServer connSock

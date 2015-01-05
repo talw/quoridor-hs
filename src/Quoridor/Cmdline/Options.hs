@@ -5,6 +5,8 @@ module Quoridor.Cmdline.Options
   ) where
 
 import           Control.Monad         (unless)
+import           Data.Char             (isDigit)
+import           Data.Maybe            (fromMaybe, isNothing)
 import           System.Environment    (getProgName)
 import           System.Exit           (exitFailure, exitSuccess)
 
@@ -20,6 +22,7 @@ data Options = Options
   { opBoardSize      :: Int
   , opNumOfPlayers   :: Int
   , opGatesPerPlayer :: Int
+  , opHostListenAddr :: String
   , opHostListenPort :: Int
   , opHttpListenPort :: Int
   , opExecMode       :: ExecMode
@@ -35,6 +38,7 @@ defaultOptions = Options
   { opBoardSize      = 9
   , opNumOfPlayers   = 2
   , opGatesPerPlayer = 10
+  , opHostListenAddr = "127.0.0.1"
   , opHostListenPort = 33996
   , opHttpListenPort = 33997
   , opExecMode       = ExLocal
@@ -124,16 +128,30 @@ options =
  where portOptionArg execMode =
          OptArg
              (\arg opts -> do
-                argNum <- maybe (return $ opHostListenPort opts)
-                  (rangedOption 1025 65535) arg
+                let mAddr = getAddr =<< arg
+                    addr  = fromMaybe (opHostListenAddr opts) mAddr
+                    mPort = getPort =<< arg
+                port <- maybe (return $ opHostListenPort opts)
+                  (rangedOption 1025 65535 . show) mPort
                 return opts
-                  { opExecMode = execMode
-                  , opHostListenPort = argNum
+                  { opExecMode       = execMode
+                  , opHostListenPort = port
+                  , opHostListenAddr = addr
                   })
-              "PORT"
+              "ADDR/PORT (either or both)"
+
        rangedOption x y arg = do
          let argNum = read arg
          unless (isInRange argNum x y) $ do
            putUsageInfoLn
            exitFailure
          return argNum
+
+       getAddr s | ':' `elem` s = Just $ takeWhile (/= ':') s
+                 | isNothing $ getPort s = Just s
+                 | otherwise = Nothing
+
+       getPort s | length s <= 5 && isNum s = Just (read s :: Int)
+                 | ':' `elem` s = getPort $ tail $ dropWhile (/= ':') s
+                 | otherwise = Nothing
+        where isNum = all isDigit

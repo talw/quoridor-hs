@@ -33,12 +33,17 @@ cmdlineMain = do
           , boardSize      = opBoardSize opts
           , numOfPlayers   = opNumOfPlayers opts
           }
+      addr = opHostListenAddr opts
+      listenPort = opHostListenPort opts
+      httpListenPort = opHttpListenPort opts
+  when (opExecMode opts /= ExLocal) $
+    putStrLn $ "Connecting to " ++ addr ++ ":" ++ show listenPort
   case opExecMode opts of
     ExLocal -> runGame playLocal gc
     ExHost  -> withSocketsDo $ runGame
-      (hostServer (opHostListenPort opts) (opHttpListenPort opts)) gc
+      (hostServer listenPort httpListenPort) gc
     joinOrProxy  -> withSocketsDo $
-      connectClient (joinOrProxy == ExProxy) $ opHostListenPort opts
+      connectClient (joinOrProxy == ExProxy) addr listenPort
   exitSuccess
 
 -- playLocal used to be structured similarly to
