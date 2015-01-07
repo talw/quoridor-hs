@@ -130,7 +130,7 @@ acceptWSPlayer port = WS.runWebSocketsSnap $ \pending ->
           (hIn, hOut, _, ph) <- runInteractiveCommand cmd
           conn <- WS.acceptRequest pending
           return (hIn, hOut, ph, conn)
-        freeRsrc (hIn, hOut, ph, conn) = do
+        freeRsrc (hIn, hOut, ph, _) = do
           hClose hIn
           hClose hOut
           terminateProcess ph

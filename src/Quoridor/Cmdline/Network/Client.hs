@@ -24,7 +24,6 @@ import           Quoridor.Cmdline.Render         (putColoredStrHtml,
 connectClient :: Bool -> String -> Int -> IO ()
 connectClient isProxy addr port = connect addr (show port) $
   \(connSock, _) -> do
-    putStrLn $ "Connecting to " ++ addr ++ ":" ++ show port
     msg <- recvFromServer connSock
     flushStrLn msg
     (gc, c) <- recvFromServer connSock

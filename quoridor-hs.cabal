@@ -8,7 +8,7 @@ author:              Tal Walter <talw10@gmail.com>
 maintainer:          Tal Walter <talw10@gmail.com>
 category:            Game
 build-type:          Simple
-cabal-version:       >=1.19
+cabal-version:       >=1.18
 
 description:
     An implementation in Haskell of the 2-to-4-player strategy game.
