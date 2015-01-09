@@ -5,29 +5,40 @@ module Quoridor.Cmdline.Network.Server
   ) where
 
 import           Control.Applicative             ((<$>))
-import           Control.Concurrent              (forkIO, threadDelay)
+import           Control.Concurrent              (forkFinally, forkIO,
+                                                  threadDelay)
 import           Control.Exception               (bracket)
-import           Control.Monad                   (filterM, forever, unless,
+import           Control.Monad                   (filterM, forM_, forever,
+                                                  unless, when, zipWithM,
                                                   (>=>))
 import           Control.Monad.Reader            (ask)
 import           Control.Monad.State             (MonadIO, get, liftIO)
 import qualified Data.ByteString                 as B
+import           Data.Functor                    (void)
 import           Data.List                       (find)
-import           Data.Maybe                      (fromJust, fromMaybe)
+import           Data.Maybe                      (fromJust, fromMaybe,
+                                                  isNothing, maybe)
 import           System.Directory                (getCurrentDirectory)
 import           System.IO                       (Handle, hClose, hFlush)
 import           System.Process                  (runInteractiveCommand,
                                                   terminateProcess)
 
 import           Control.Concurrent.Async        (race)
+import           Control.Concurrent.MVar         (MVar, newEmptyMVar, putMVar,
+                                                  takeMVar)
+import           Control.Concurrent.STM          (STM, TChan, TVar, atomically,
+                                                  newTChanIO, newTVarIO,
+                                                  readTChan, readTVar,
+                                                  writeTChan)
 import           Network.Simple.TCP              (HostPreference (Host),
-                                                  accept, listen)
+                                                  Socket, accept, listen)
 import qualified Network.WebSockets              as WS
 import qualified Network.WebSockets.Snap         as WS
 import qualified Snap.Core                       as Snap
 import qualified Snap.Http.Server                as Snap
 import qualified Snap.Util.FileServe             as Snap
 import           System.FilePath                 ((</>))
+import           Text.Printf                     (printf)
 
 import           Paths_quoridor_hs               (getDataDir)
 import           Quoridor
@@ -35,72 +46,145 @@ import           Quoridor.Cmdline.Messages
 import           Quoridor.Cmdline.Network.Common
 import           Quoridor.Cmdline.Parse          (parseTurn)
 
+type PChans = TVar [TChan Message]
+type GameChan = TChan (Color, Turn)
+
 -- | Given a port, hosts a game server that listens
 -- on the given port.
--- This returns a Game monad which should be used with runGame.
+-- This isn't optimal. If a player keeps on connecting and
+-- disconnecting, there's no limit to the depth of the stack that is
+-- possible here.
 hostServer :: Int -> Int -> Game IO ()
 hostServer quoriHostPort httpPort = do
   liftIO $ forkIO $ httpListen quoriHostPort httpPort
   listen (Host "127.0.0.1") (show quoriHostPort) $
     \(lstnSock, _) -> do
       gc <- ask
+      gameChan <- liftIO newTChanIO
+      playerChans <- liftIO $ newTVarIO []
 
-      let getPlayers 0 socks = do
-            coSocks <- liftIO $ filterM isAliveSock socks
-            if length coSocks /= length socks
-              then getPlayers (length socks - length coSocks) coSocks
-              else do
-                let colors = map toEnum [0..]
-                    connPs = zipWith ConnPlayer socks colors
-                    {-getConnPlayers socks' = zipWith ConnPlayer socks' colors-}
-                    {-connPs = getConnPlayers socks-}
-                mapM_ (\p -> sendToPlayer (gc, coplColor p) p) connPs
-                playServer connPs
+      let
+        getPlayers 0 socks = do
+          coSocks <- filterM isAliveSock socks
+          if length coSocks /= length socks
+            then getPlayers (length socks - length coSocks) coSocks
+            else do
+              let colors = map toEnum [0..]
+              doneConnPs <-
+                zipWithM (handleClient gameChan playerChans) socks colors
+              let connPs = map snd doneConnPs
+              forM_ connPs $ \p ->
+                sendToPlayer (FstGameMsg gc (coplColor p)) p
+              return (map fst doneConnPs, connPs)
 
-          getPlayers n socks = accept lstnSock $ \(connSock, _) -> do
-            let msg = "Connected. " ++ if n > 1
-                  then "Waiting for other players." else ""
-            liftIO $ putStrLn msg
-            sendToSock msg connSock
-            getPlayers (n-1) $ connSock : socks
+        getPlayers n socks = accept lstnSock $ \(connSock, _) -> do
+          let msg = if n - 1 > 0
+                then printf "Waiting for %d more players." $ show $ n - 1
+                else "Game can begin."
+          putStrLn msg
+          sendMsg (WaitMsg msg) connSock
+          getPlayers (n-1) $ connSock : socks
 
-      getPlayers (numOfPlayers gc) []
+      (dones, connPs) <- liftIO $ getPlayers (numOfPlayers gc) []
+      handleGame gameChan connPs
+      -- Allow 10 seconds for the clients to shutdown
+      void $ liftIO $ race (threadDelay $ 10 * 1000 * 1000)
+                    (mapM_ takeMVar dones)
 
-playServer :: [ConnPlayer] -> Game IO ()
-playServer connPs = play msgInitialTurn
+handleClient :: GameChan -> PChans -> Socket ->
+                Color -> IO (MVar (), ConnPlayer)
+handleClient gameChan playerChans sock col = do
+  chan <- newTChanIO
+  done <- newEmptyMVar
+  let action = race (handleMsgSend chan sock)
+                    (handleClientInput gameChan playerChans col sock)
+      finally _ = putMVar done ()
+  forkFinally action finally
+  return $ (done, ConnPlayer chan col)
+
+handleGame :: GameChan -> [ConnPlayer] -> Game IO ()
+handleGame gameChan connPs = go msgInitialTurn
   where
-    play msg = do
+    go msg = do
       gs <- get
       vm <- getCurrentValidMoves
-      mapM_ (sendToPlayer (gs,vm,msg)) connPs
-      case winner gs of
-        Just _  -> liftIO $ threadDelay $ 10 * 1000 * 1000
-        Nothing -> do
-          let currColor = color $ currP gs
-              currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
-              sendToCurrPlayer x = sendToPlayer x currConnP
+      liftIO $ atomically $
+        broadcast (GameMsg gs vm msg) $ map coplChan connPs
+      when (isNothing $ winner gs) $ do
+        let currColor = color $ currP gs
+            currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
+            getTurnOfCurrP = do
+              (col, turn) <- atomically $ readTChan gameChan
+              if (col == currColor) then return turn
+                                    else getTurnOfCurrP
+            execValidTurn = do
+              turn <- liftIO $ getTurnOfCurrP
+              let reAskForInput msg' = do sendToPlayer (GameMsg gs vm msg')
+                                                       currConnP
+                                          execValidTurn
+              makeTurn turn >>= maybe (reAskForInput msgInvalidTurn)
+                                      return
+        turn <- execValidTurn
+        go $ msgValidTurn currColor turn
 
-              execValidTurn = do
-                strTurn <- recvFromPlayer currConnP
-                let reAskForInput msg' = do sendToCurrPlayer (gs,vm,msg')
-                                            execValidTurn
-                either reAskForInput
-                       (makeTurn >=> maybe (reAskForInput msgInvalidTurn)
-                                           return)
-                       $ parseTurn strTurn
+{-playServer :: [ConnPlayer] -> Game IO ()-}
+{-playServer connPs = play msgInitialTurn-}
+  {-where-}
+    {-play msg = do-}
+      {-gs <- get-}
+      {-vm <- getCurrentValidMoves-}
+      {-mapM_ (sendToPlayer (gs,vm,msg)) connPs-}
+      {-case winner gs of-}
+        {-Just _  -> liftIO $ threadDelay $ 10 * 1000 * 1000-}
+        {-Nothing -> do-}
+          {-let currColor = color $ currP gs-}
+              {-currConnP = fromJust $ find ((currColor ==) . coplColor) connPs-}
+              {-sendToCurrPlayer x = sendToPlayer x currConnP-}
 
-          turn <- execValidTurn
-          play $ msgValidTurn currColor turn
+              {-execValidTurn = do-}
+                {-strTurn <- recvFromPlayer currConnP-}
+                {-let reAskForInput msg' = do sendToCurrPlayer (gs,vm,msg')-}
+                                            {-execValidTurn-}
+                {-either reAskForInput-}
+                       {-(makeTurn >=> maybe (reAskForInput msgInvalidTurn)-}
+                                           {-return)-}
+                       {-$ parseTurn strTurn-}
 
-sendToPlayer :: (Show s, MonadIO m) => s -> ConnPlayer -> m ()
-sendToPlayer s cnp = sendToSock s $ coplSock cnp
+          {-turn <- execValidTurn-}
+          {-play $ msgValidTurn currColor turn-}
+
+sendToPlayer :: MonadIO m => Message -> ConnPlayer -> m ()
+sendToPlayer msg cnp = liftIO $ atomically $ writeTChan (coplChan cnp) msg
 
 -- | The error message will appear only if the current player exits.
 -- To handle the case where other players will exit I'll have to rewrite the whole
 -- mechanism to be asynchronous between players.
-recvFromPlayer :: (Functor m, MonadIO m) => ConnPlayer -> m String
-recvFromPlayer cnp = fromMaybe throwErr <$> recvFromSock (coplSock cnp)
-  where throwErr = error $ "Lost connection with " ++ show (coplColor cnp)
+{-recvFromPlayer :: (Functor m, MonadIO m) => ConnPlayer -> m String-}
+{-recvFromPlayer cnp = fromMaybe throwErr <$> recvFromSock (coplSock cnp)-}
+  {-where throwErr = error $ "Lost connection with " ++ show (coplColor cnp)-}
+
+handleMsgSend :: TChan Message -> Socket -> IO ()
+handleMsgSend chan sock = do
+  msg <- atomically $ readTChan chan
+  sendMsg msg sock
+  handleMsgSend chan sock
+
+handleClientInput :: GameChan -> PChans -> Color -> Socket -> IO ()
+handleClientInput gameChan playerChans col sock = go
+ where
+  go = do
+    msg <- recvMsg sock
+    atomically $ case msg of
+      chatMsg@(ChatMsg _ _) -> readTVar playerChans >>= broadcast chatMsg
+      TurnMsg turn          -> writeTChan gameChan (col, turn)
+      _ -> error "handleClientInput - unexpected Message"
+    go
+
+broadcast :: Message -> [TChan Message] -> STM ()
+broadcast msg playerChans = forM_ playerChans $ (flip writeTChan) msg
+
+
+-- Web interface
 
 httpListen :: Int -> Int -> IO ()
 httpListen quoriHostPort httpPort = Snap.httpServe config $ app quoriHostPort
