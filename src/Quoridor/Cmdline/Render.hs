@@ -3,6 +3,7 @@ module Quoridor.Cmdline.Render
   , runRenderColor
   , putColoredStrTerm
   , putColoredStrHtml
+  , putChatMessageHtml
   ) where
 
 import           Control.Monad.Reader      (ReaderT, reader, runReaderT)
@@ -48,7 +49,7 @@ data RenderState = RenderState
 --- exported functions
 
 -- | Returns a String of the game board along with some basic info
-runRender :: GameState -> GameConfig -> [Cell] -> String
+runRender :: GameState -> GameConfig -> ValidMoves -> String
 runRender gs gc vms = D.toList w
   where (_,w) =
           runWriter (runStateT (runReaderT (render cp) gc) initialRenderState)
@@ -63,7 +64,7 @@ runRender gs gc vms = D.toList w
 -- and a series of IO () actions, one per character, which describe how
 -- to set the terminal color. putColoredStr can be used to apply
 -- those actions automatically
-runRenderColor :: GameState -> GameConfig -> [Cell] -> (String, [CA.Color])
+runRenderColor :: GameState -> GameConfig -> ValidMoves -> (String, [CA.Color])
 runRenderColor = ((addColor .) .) . runRender
 
 -- | Given an input such as the output of runRenderColor, writes the
@@ -80,10 +81,15 @@ putColoredStrTerm (str, colors) = mapM_ putColoredChar $ zip str colors
 -- I can avoid duplicating the coloring logic"
 putColoredStrHtml :: (String, [CA.Color]) -> IO ()
 putColoredStrHtml (str, colors) = putStr $ concatMap addColorProp $ zip str colors
-  where addColorProp (ch, CA.White) = [ch]
-        addColorProp (ch, col) = printf "<font class=\"%s\">%c</font>" (show col) ch
+  where
+    addColorProp (ch, CA.White) = [ch]
+    addColorProp (ch, col) = printf "<font class=\"%s\">%c</font>" (show col) ch
 
-
+-- | This is only temporary, for testing,
+-- until the web interface will be jsonized
+putChatMessageHtml :: Color -> String -> IO ()
+putChatMessageHtml col msg = putStr $ printf "##CHAT##%s##CHAT##" inner
+  where inner = printf "%s : %s" (show col) msg :: String
 
 --- helper functions
 

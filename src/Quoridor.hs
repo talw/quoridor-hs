@@ -31,6 +31,9 @@ type HalfGates = S.Set HalfGate
 -- The board is a square
 type BoardSize = Int
 
+-- | List of valid moves for a player
+type ValidMoves = [Cell]
+
 -- | The monad used for running the game.
 -- Basically adds layers of ReaderT for configuration,
 -- StateT for state, and some monad for the rest

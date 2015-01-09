@@ -76,7 +76,7 @@ renderCurrentBoard = do
 -- Function that could be common to playLocal,
 -- playClient(handleWinOrTurn, wonAction, renderBoard) and playServer(handleParse)
 -- if I change playClient and playServer to be in the same vein as playLocal
-renderBoard :: GameState -> GameConfig -> [Cell] -> IO ()
+renderBoard :: GameState -> GameConfig -> ValidMoves -> IO ()
 renderBoard gs gc vms = putColoredStrTerm $ runRenderColor gs gc vms
 
 handleParse :: MonadIO m =>

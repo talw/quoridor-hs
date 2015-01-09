@@ -5,7 +5,10 @@ where
 import           Quoridor (Color, Turn)
 
 msgAwaitingTurn :: Color -> String
-msgAwaitingTurn c = "Waiting for " ++ show c ++ " to make a move."
+msgAwaitingTurn c = "Waiting for " ++ show c ++ " to make his turn."
+
+msgYourTurn :: String
+msgYourTurn = "It's your turn."
 
 msgGameEnd :: Color -> String
 msgGameEnd c = show c ++ " won!"
