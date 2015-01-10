@@ -107,28 +107,28 @@ handleClient gameChan playerChans sock col = do
 
 handleGame :: GameChan -> [ConnPlayer] -> Game IO ()
 handleGame gameChan connPs = go msgInitialTurn
-  where
-    go msg = do
-      gs <- get
-      vm <- getCurrentValidMoves
-      liftIO $ atomically $
-        broadcast (GameMsg gs vm msg) $ map coplChan connPs
-      when (isNothing $ winner gs) $ do
-        let currColor = color $ currP gs
-            currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
-            getTurnOfCurrP = do
-              (col, turn) <- atomically $ readTChan gameChan
-              if col == currColor then return turn
-                                    else getTurnOfCurrP
-            execValidTurn = do
-              turn <- liftIO getTurnOfCurrP
-              let reAskForInput msg' = do sendToPlayer (GameMsg gs vm msg')
-                                                       currConnP
-                                          execValidTurn
-              makeTurn turn >>= maybe (reAskForInput msgInvalidTurn)
-                                      return
-        turn <- execValidTurn
-        go $ msgValidTurn currColor turn
+ where
+  go msg = do
+    gs <- get
+    vm <- getCurrentValidMoves
+    liftIO $ atomically $
+      broadcast (GameMsg gs vm msg) $ map coplChan connPs
+    when (isNothing $ winner gs) $ do
+      let currColor = color $ currP gs
+          currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
+          getTurnOfCurrP = do
+            (col, turn) <- atomically $ readTChan gameChan
+            if col == currColor then return turn
+                                  else getTurnOfCurrP
+          execValidTurn = do
+            turn <- liftIO getTurnOfCurrP
+            let reAskForInput msg' = do sendToPlayer (GameMsg gs vm msg')
+                                                     currConnP
+                                        execValidTurn
+            makeTurn turn >>= maybe (reAskForInput msgInvalidTurn)
+                                    return
+      turn <- execValidTurn
+      go $ msgValidTurn currColor turn
 
 sendToPlayer :: MonadIO m => Message -> ConnPlayer -> m ()
 sendToPlayer msg cnp = liftIO $ atomically $ writeTChan (coplChan cnp) msg
@@ -164,21 +164,23 @@ broadcast msg playerChans = forM_ playerChans $ flip writeTChan msg
 -- Web interface
 
 httpListen :: Int -> Int -> IO ()
-httpListen quoriHostPort httpPort = Snap.httpServe config $ app quoriHostPort
-  where
-    config = Snap.setPort httpPort $
-             Snap.setErrorLog  Snap.ConfigNoLog $
-             Snap.setAccessLog Snap.ConfigNoLog
-             Snap.defaultConfig
-    app :: Int -> Snap.Snap ()
-    app port = do
-      dataDir <- liftIO getDataDir
-      Snap.route
-        [ ("",           Snap.ifTop $ Snap.serveFile $ dataDir </> "console.html")
-        , ("console.js", Snap.serveFile $ dataDir </> "console.js")
-        , ("style.css",  Snap.serveFile $ dataDir </> "style.css")
-        , ("play",       acceptWSPlayer port)
-        ]
+httpListen quoriHostPort httpPort = do
+  putStrLn "Http server: "
+  Snap.httpServe config $ app quoriHostPort
+ where
+  config = Snap.setPort httpPort $
+           Snap.setErrorLog  Snap.ConfigNoLog $
+           Snap.setAccessLog Snap.ConfigNoLog
+           Snap.defaultConfig
+  app :: Int -> Snap.Snap ()
+  app port = do
+    dataDir <- liftIO getDataDir
+    Snap.route
+      [ ("",           Snap.ifTop $ Snap.serveFile $ dataDir </> "console.html")
+      , ("console.js", Snap.serveFile $ dataDir </> "console.js")
+      , ("style.css",  Snap.serveFile $ dataDir </> "style.css")
+      , ("play",       acceptWSPlayer port)
+      ]
 
 acceptWSPlayer :: Int -> Snap.Snap ()
 acceptWSPlayer port = WS.runWebSocketsSnap $ \pending ->
