@@ -4,20 +4,17 @@ module Quoridor.Cmdline.Network.Server
   ( hostServer
   ) where
 
-import           Control.Applicative             ((<$>))
 import           Control.Concurrent              (forkFinally, forkIO,
                                                   threadDelay)
 import           Control.Exception               (bracket)
 import           Control.Monad                   (filterM, forM_, forever,
-                                                  unless, when, zipWithM,
-                                                  (>=>))
+                                                  unless, when, zipWithM)
 import           Control.Monad.Reader            (ask)
 import           Control.Monad.State             (MonadIO, get, liftIO)
 import qualified Data.ByteString                 as B
 import           Data.Functor                    (void)
 import           Data.List                       (find)
-import           Data.Maybe                      (fromJust, fromMaybe,
-                                                  isNothing, maybe)
+import           Data.Maybe                      (fromJust, isNothing)
 import           System.Directory                (getCurrentDirectory)
 import           System.IO                       (Handle, hClose, hFlush)
 import           System.Process                  (runInteractiveCommand,
@@ -27,9 +24,9 @@ import           Control.Concurrent.Async        (race)
 import           Control.Concurrent.MVar         (MVar, newEmptyMVar, putMVar,
                                                   takeMVar)
 import           Control.Concurrent.STM          (STM, TChan, TVar, atomically,
-                                                  newTChanIO, newTVarIO,
-                                                  readTChan, readTVar,
-                                                  writeTChan)
+                                                  modifyTVar, newTChanIO,
+                                                  newTVarIO, readTChan,
+                                                  readTVar, writeTChan)
 import           Network.Simple.TCP              (HostPreference (Host),
                                                   Socket, accept, listen)
 import qualified Network.WebSockets              as WS
@@ -44,7 +41,6 @@ import           Paths_quoridor_hs               (getDataDir)
 import           Quoridor
 import           Quoridor.Cmdline.Messages
 import           Quoridor.Cmdline.Network.Common
-import           Quoridor.Cmdline.Parse          (parseTurn)
 
 type PChans = TVar [TChan Message]
 type GameChan = TChan (Color, Turn)
@@ -67,40 +63,47 @@ hostServer quoriHostPort httpPort = do
         getPlayers 0 socks = do
           coSocks <- filterM isAliveSock socks
           if length coSocks /= length socks
-            then getPlayers (length socks - length coSocks) coSocks
+            then do
+              let playersLeft = length socks - length coSocks
+              liftIO $ putStrLn $
+                printf "Some players were disconnected. Waiting for %d more. "
+                  playersLeft
+              getPlayers playersLeft coSocks
             else do
               let colors = map toEnum [0..]
-              doneConnPs <-
+              doneConnPs <- liftIO $
                 zipWithM (handleClient gameChan playerChans) socks colors
               let connPs = map snd doneConnPs
+              let dones = map fst doneConnPs
               forM_ connPs $ \p ->
                 sendToPlayer (FstGameMsg gc (coplColor p)) p
-              return (map fst doneConnPs, connPs)
+
+              handleGame gameChan connPs
+              -- Allow 10 seconds for the clients to shutdown
+              void $ liftIO $ race (threadDelay $ 10 * 1000 * 1000)
+                                   (mapM_ takeMVar dones)
 
         getPlayers n socks = accept lstnSock $ \(connSock, _) -> do
           let msg = if n - 1 > 0
-                then printf "Waiting for %d more players." $ show $ n - 1
-                else "Game can begin."
-          putStrLn msg
+                then printf "Waiting for %d more player(s)." $ n - 1
+                else "Everyone connected. Rechecking connections..."
+          liftIO $ putStrLn msg
           sendMsg (WaitMsg msg) connSock
           getPlayers (n-1) $ connSock : socks
 
-      (dones, connPs) <- liftIO $ getPlayers (numOfPlayers gc) []
-      handleGame gameChan connPs
-      -- Allow 10 seconds for the clients to shutdown
-      void $ liftIO $ race (threadDelay $ 10 * 1000 * 1000)
-                    (mapM_ takeMVar dones)
+      getPlayers (numOfPlayers gc) []
 
 handleClient :: GameChan -> PChans -> Socket ->
                 Color -> IO (MVar (), ConnPlayer)
 handleClient gameChan playerChans sock col = do
   chan <- newTChanIO
+  atomically $ modifyTVar playerChans (chan :)
   done <- newEmptyMVar
   let action = race (handleMsgSend chan sock)
                     (handleClientInput gameChan playerChans col sock)
       finally _ = putMVar done ()
   forkFinally action finally
-  return $ (done, ConnPlayer chan col)
+  return (done, ConnPlayer chan col)
 
 handleGame :: GameChan -> [ConnPlayer] -> Game IO ()
 handleGame gameChan connPs = go msgInitialTurn
@@ -115,10 +118,10 @@ handleGame gameChan connPs = go msgInitialTurn
             currConnP = fromJust $ find ((currColor ==) . coplColor) connPs
             getTurnOfCurrP = do
               (col, turn) <- atomically $ readTChan gameChan
-              if (col == currColor) then return turn
+              if col == currColor then return turn
                                     else getTurnOfCurrP
             execValidTurn = do
-              turn <- liftIO $ getTurnOfCurrP
+              turn <- liftIO getTurnOfCurrP
               let reAskForInput msg' = do sendToPlayer (GameMsg gs vm msg')
                                                        currConnP
                                           execValidTurn
@@ -126,32 +129,6 @@ handleGame gameChan connPs = go msgInitialTurn
                                       return
         turn <- execValidTurn
         go $ msgValidTurn currColor turn
-
-{-playServer :: [ConnPlayer] -> Game IO ()-}
-{-playServer connPs = play msgInitialTurn-}
-  {-where-}
-    {-play msg = do-}
-      {-gs <- get-}
-      {-vm <- getCurrentValidMoves-}
-      {-mapM_ (sendToPlayer (gs,vm,msg)) connPs-}
-      {-case winner gs of-}
-        {-Just _  -> liftIO $ threadDelay $ 10 * 1000 * 1000-}
-        {-Nothing -> do-}
-          {-let currColor = color $ currP gs-}
-              {-currConnP = fromJust $ find ((currColor ==) . coplColor) connPs-}
-              {-sendToCurrPlayer x = sendToPlayer x currConnP-}
-
-              {-execValidTurn = do-}
-                {-strTurn <- recvFromPlayer currConnP-}
-                {-let reAskForInput msg' = do sendToCurrPlayer (gs,vm,msg')-}
-                                            {-execValidTurn-}
-                {-either reAskForInput-}
-                       {-(makeTurn >=> maybe (reAskForInput msgInvalidTurn)-}
-                                           {-return)-}
-                       {-$ parseTurn strTurn-}
-
-          {-turn <- execValidTurn-}
-          {-play $ msgValidTurn currColor turn-}
 
 sendToPlayer :: MonadIO m => Message -> ConnPlayer -> m ()
 sendToPlayer msg cnp = liftIO $ atomically $ writeTChan (coplChan cnp) msg
@@ -181,7 +158,7 @@ handleClientInput gameChan playerChans col sock = go
     go
 
 broadcast :: Message -> [TChan Message] -> STM ()
-broadcast msg playerChans = forM_ playerChans $ (flip writeTChan) msg
+broadcast msg playerChans = forM_ playerChans $ flip writeTChan msg
 
 
 -- Web interface

@@ -4,13 +4,11 @@ module Quoridor.Cmdline.Network.Client
   ( connectClient
   ) where
 
-import           Control.Applicative             ((<$>))
 import           Control.Concurrent.Async        (race)
 import           Control.Concurrent.MVar         (MVar, newMVar, withMVar)
-import           Control.Monad                   (when)
-import           Control.Monad.State             (MonadIO, liftIO)
+import           Control.Monad                   (unless, when)
 import           Data.Functor                    (void)
-import           Data.Maybe                      (fromMaybe)
+import           Data.Maybe                      (isJust)
 import           System.IO                       (BufferMode (LineBuffering),
                                                   hFlush, hReady,
                                                   hSetBuffering, stdin, stdout)
@@ -79,25 +77,26 @@ handleServerInput isProxy gc myColor sock writeLock = go
  where
   go = do
     msg <- recvMsg sock
-    case msg of
+    quit <- case msg of
       GameMsg gs vm str -> handleGameMsg gs vm str
-      ChatMsg col str   -> handleChatMsg col str
+      ChatMsg col str   -> handleChatMsg col str >> return False
       _                 -> error "handleServerInput - unexpected Message"
-    go
+    unless quit go
 
-  handleGameMsg :: GameState -> ValidMoves -> String -> IO ()
+  handleGameMsg :: GameState -> ValidMoves -> String -> IO Bool
   handleGameMsg gs vm msg = do
     --  WHNF to avoid computing the board string inside withMVar
     let !boardStr = runRenderColor gs gc vm
         putBoardStrFunc = if isProxy then putColoredStrHtml
                                else (putChar '\n' >>) . putColoredStrTerm
     withMVar writeLock $ \_ -> do
-      putBoardStrFunc $ boardStr
+      putBoardStrFunc boardStr
       flushStrLn msg
       flushStrLn $ case (winner gs, color $ currP gs) of
                    (Just c, _) -> msgGameEnd c
                    (Nothing, c) | c == myColor -> msgYourTurn
                                 | otherwise    -> msgAwaitingTurn c
+      return $ isJust $ winner gs
   handleChatMsg :: Color -> String -> IO ()
   handleChatMsg col msg = when isProxy $ putChatMessageHtml col msg
 

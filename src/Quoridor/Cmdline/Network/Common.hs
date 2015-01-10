@@ -9,7 +9,6 @@ module Quoridor.Cmdline.Network.Common
   , isAliveSock
   ) where
 
-import           Control.Applicative    ((<$>))
 import           Control.Exception      (Exception, SomeException, catch,
                                          handle, throw)
 import           Control.Monad.State    (MonadIO, liftIO, replicateM_)
@@ -60,7 +59,8 @@ isAliveSock sock = liftIO $
 
 -- | Type-safer than sendToSock/recvFromSock duo
 recvMsg :: (MonadIO m, Functor m) => Socket -> m Message
-recvMsg = (fromJust <$>) . recvFromSock
+recvMsg = recvFromSock
+{-recvMsg = (fromJust <$>) . recvFromSock-}
 
 recvFromSock :: (Read r, Functor m, MonadIO m) => Socket -> m r
 recvFromSock sock = liftIO $ handle handler $ do

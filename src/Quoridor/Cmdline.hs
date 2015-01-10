@@ -11,6 +11,7 @@ import           System.Environment              (getArgs)
 import           System.Exit                     (exitSuccess)
 
 import           Network.Simple.TCP              (withSocketsDo)
+import           Text.Printf                     (printf)
 
 import           Quoridor
 import           Quoridor.Cmdline.Messages       (msgGameEnd, msgInitialTurn,
@@ -36,8 +37,9 @@ cmdlineMain = do
       addr = opHostListenAddr opts
       listenPort = opHostListenPort opts
       httpListenPort = opHttpListenPort opts
-  when (opExecMode opts /= ExLocal) $
-    putStrLn $ "Connecting to " ++ addr ++ ":" ++ show listenPort
+  when (opExecMode opts /= ExLocal) $ do
+    putStrLn $ printf "Chosen address: %s" addr
+    putStrLn $ printf "Chosen port: %d" listenPort
   case opExecMode opts of
     ExLocal -> runGame playLocal gc
     ExHost  -> withSocketsDo $ runGame
