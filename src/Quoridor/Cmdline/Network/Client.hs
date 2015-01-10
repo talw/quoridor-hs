@@ -6,8 +6,9 @@ import           Control.Applicative             ((<$>))
 import           Control.Monad                   (when)
 import           Control.Monad.State             (MonadIO, liftIO)
 import           Data.Maybe                      (fromMaybe)
-import           System.IO                       (hFlush, hReady, stdin,
-                                                  stdout)
+import           System.IO                       (BufferMode (LineBuffering),
+                                                  hFlush, hReady,
+                                                  hSetBuffering, stdin, stdout)
 
 import           Network.Simple.TCP              (Socket, connect)
 
@@ -24,8 +25,11 @@ import           Quoridor.Cmdline.Render         (putColoredStrHtml,
 connectClient :: Bool -> String -> Int -> IO ()
 connectClient isProxy addr port = connect addr (show port) $
   \(connSock, _) -> do
+    -- In case the client is invoked as a proxy
+    -- because the default is BlockBuffering
+    hSetBuffering stdout LineBuffering
     msg <- recvFromServer connSock
-    flushStrLn msg
+    putStrLn msg
     (gc, c) <- recvFromServer connSock
     playClient connSock isProxy gc c
 
@@ -37,16 +41,16 @@ playClient connSock isProxy gc myColor = play
       emptyInput
       (if isProxy then putColoredStrHtml else putColoredStrTerm) $
         runRenderColor gs gc vm
-      flushStrLn msg
+      putStrLn msg
       hFlush stdout
       case winner gs of
         Just c  ->
-          flushStrLn $ msgGameEnd c
+          putStrLn $ msgGameEnd c
         Nothing -> do
           let currPC = color $ currP gs
           if currPC /= myColor
             then do
-              flushStrLn $ msgAwaitingTurn currPC
+              putStrLn $ msgAwaitingTurn currPC
               play
             else do
               strTurn <- liftIO getLine
@@ -56,11 +60,6 @@ playClient connSock isProxy gc myColor = play
 recvFromServer :: (Functor m, MonadIO m, Read r) => Socket -> m r
 recvFromServer sock = fromMaybe throwErr <$> recvFromSock sock
   where throwErr = error "Lost connection with the server"
-
--- | Like putStrLn, but flushes right afterwards.
-flushStrLn :: String -> IO ()
-flushStrLn = (hFlush stdout <<) . putStrLn
-  where (<<) = flip (>>)
 
 -- | This empties command line input that was buffered
 -- while it wasn't the player's turn.
