@@ -65,9 +65,11 @@ hostServer quoriHostPort httpPort = do
           if length coSocks /= length socks
             then do
               let playersLeft = length socks - length coSocks
-              liftIO $ putStrLn $
-                printf "Some players were disconnected. Waiting for %d more. "
-                  playersLeft
+                  msg = printf "Some players were disconnected. \
+                                   \Waiting for %d more. "
+                    playersLeft
+              liftIO $ putStrLn msg
+              liftIO $ forM_ coSocks $ sendMsg $ WaitMsg msg
               getPlayers playersLeft coSocks
             else do
               let colors = map toEnum [0..]
