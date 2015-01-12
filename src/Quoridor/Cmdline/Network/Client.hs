@@ -18,10 +18,10 @@ import           Network.Simple.TCP              (Socket, connect)
 import           Quoridor
 import           Quoridor.Cmdline.Messages
 import           Quoridor.Cmdline.Network.Common
-import           Quoridor.Cmdline.Parse          (parseTurn)
-import           Quoridor.Cmdline.Render         (putChatMessageHtml,
-                                                  putColoredStrHtml,
-                                                  putColoredStrTerm,
+import           Quoridor.Cmdline.Parse          (parseMessage)
+import           Quoridor.Cmdline.Render         (putChatMessageJson,
+                                                  putColoredBoardHtml,
+                                                  putColoredBoardTerm,
                                                   runRenderColor)
 
 
@@ -40,7 +40,7 @@ connectClient isProxy addr port = connect addr (show port) $
             FstGameMsg gc c -> do
               writeLock <- newMVar ()
               void $ race (handleServerInput isProxy gc c sock writeLock)
-                          (handleUserInput sock writeLock)
+                          (handleUserInput c sock writeLock)
             _ -> error "connectClient - unexpected Message"
     go
 
@@ -87,8 +87,8 @@ handleServerInput isProxy gc myColor sock writeLock = go
   handleGameMsg gs vm msg = do
     --  WHNF to avoid computing the board string inside withMVar
     let !boardStr = runRenderColor gs gc vm
-        putBoardStrFunc = if isProxy then putColoredStrHtml
-                               else (putChar '\n' >>) . putColoredStrTerm
+        putBoardStrFunc = if isProxy then putColoredBoardHtml
+                               else (putChar '\n' >>) . putColoredBoardTerm
     withMVar writeLock $ \_ -> do
       putBoardStrFunc boardStr
       flushStrLn msg
@@ -98,16 +98,18 @@ handleServerInput isProxy gc myColor sock writeLock = go
                                 | otherwise    -> msgAwaitingTurn c
       return $ isJust $ winner gs
   handleChatMsg :: Color -> String -> IO ()
-  handleChatMsg col msg = when isProxy $ putChatMessageHtml col msg
+  handleChatMsg col msg = when isProxy $ putChatMessageJson col msg
 
-handleUserInput :: Socket -> MVar () -> IO ()
-handleUserInput sock writeLock = do
-  input <- getLine
-  either
-    (\err -> withMVar writeLock $ \_ -> putStrLn err)
-    (\turn -> sendMsg (TurnMsg turn) sock)
-    $ parseTurn input
-  handleUserInput sock writeLock
+handleUserInput :: Color -> Socket -> MVar () -> IO ()
+handleUserInput c sock writeLock = go
+ where
+  go = do
+    input <- getLine
+    either
+      (\err -> withMVar writeLock $ \_ -> putStrLn err)
+      (`sendMsg` sock)
+      $ parseMessage c input
+    go
 
 {-recvFromServer :: (Functor m, MonadIO m) => Socket -> m Message-}
 {-recvFromServer = recvMsg-}

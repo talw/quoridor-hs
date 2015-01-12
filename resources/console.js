@@ -1,5 +1,9 @@
-function appendOutput(cls, text) {
-    $('#console-output').append('<pre class="' + cls + '">' + text + '</pre>');
+function appendOutput(cls, text, id) {
+    $(id).append('<pre class="' + cls + '">' + text + '</pre>');
+    if (id === '#chat-output')
+    {
+        $(id)[0].scrollTop = $(id)[0].scrollHeight;
+    }
     $('#line').focus();
     $('#line')[0].scrollIntoView({block: "end", behavior: "instant"});
 }
@@ -10,22 +14,32 @@ $(document).ready(function () {
     var uri = "ws://"+hostName+":"+port+"/play"
     var ws = new WebSocket(uri);
 
-    appendOutput('stderr', 'Opening WebSockets connection...\n');
+    appendOutput('stderr', 'Opening WebSockets connection...\n', '#console-output');
 
     ws.onerror = function(event) {
-        appendOutput('stderr', 'WebSockets error: ' + event.data + '\n');
+        appendOutput('stderr', 'WebSockets error: ' + event.data + '\n', '#console-output');
     };
 
     ws.onopen = function() {
-        appendOutput('stderr', 'WebSockets connection successful!\n');
+        appendOutput('stderr', 'WebSockets connection successful!\n', '#console-output');
     };
 
     ws.onclose = function() {
-        appendOutput('stderr', 'WebSockets connection closed.\n');
+        appendOutput('stderr', 'WebSockets connection closed.\n', '#console-output');
     };
 
     ws.onmessage = function(event) {
-        appendOutput('stdout', event.data);
+        try
+        {
+            var chatMsg = $.parseJSON(event.data);
+            if (chatMsg.msgType === 'chat')
+            {
+                appendOutput('stdout',chatMsg.text.concat('\n'), '#chat-output');
+            }
+        }
+        catch (e) {
+            appendOutput('stdout', event.data, '#console-output');
+        }
     };
 
     $('#console-input').submit(function () {

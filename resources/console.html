@@ -8,14 +8,15 @@
         <script type="text/javascript" src="console.js"></script>
     </head>
     <body>
-        <div>
-            <div id="console" style="display: block">
-                <div id="console-output"></div>
-                <form id="console-input">
-                    <code>$ </code><input type="text" size="64" id="line" />
-                    <input type="submit" style="display: none" />
-                </form>
-            </div>
+        <div id="console">
+            <div id="console-output"></div>
+            <form id="console-input">
+                <code>$ </code><input type="text" size="64" id="line" />
+                <input type="submit" style="display: none" />
+            </form>
+        </div>
+        <div id="chat-output">
+          <p class="stdin">Chat panel</p>
         </div>
     </body>
 </html>

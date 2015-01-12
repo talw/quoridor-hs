@@ -1,9 +1,10 @@
 module Quoridor.Cmdline.Render
   ( runRender
   , runRenderColor
-  , putColoredStrTerm
-  , putColoredStrHtml
-  , putChatMessageHtml
+  , putColoredBoardTerm
+  , putColoredStrJson
+  , putColoredBoardHtml
+  , putChatMessageJson
   ) where
 
 import           Control.Monad.Reader      (ReaderT, reader, runReaderT)
@@ -70,26 +71,31 @@ runRenderColor = ((addColor .) .) . runRender
 -- | Given an input such as the output of runRenderColor, writes the
 -- game board along with some basic info, to the screen, applying
 -- the IO actions to colorize the output.
-putColoredStrTerm :: (String, [CA.Color]) -> IO ()
-putColoredStrTerm (str, colors) = mapM_ putColoredChar $ zip str colors
-  where putColoredChar (ch, col) = colorToAction col >> putChar ch
-        colorToAction col =
-          CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]
+putColoredBoardTerm :: (String, [CA.Color]) -> IO ()
+putColoredBoardTerm (str, colors) = mapM_ putColoredChar $ zip str colors
+ where putColoredChar (ch, col) = colorToAction col >> putChar ch
+       colorToAction col =
+         CA.setSGR [CA.SetColor CA.Foreground CA.Vivid col]
+
 
 -- | This is wasteful compared to having this logic in the browser's javascript.
 -- However this is still amounts to very little data being transferred, and that way
 -- I can avoid duplicating the coloring logic"
-putColoredStrHtml :: (String, [CA.Color]) -> IO ()
-putColoredStrHtml (str, colors) = putStr $ concatMap addColorProp $ zip str colors
+putColoredBoardHtml :: (String, [CA.Color]) -> IO ()
+putColoredBoardHtml (str, colors) = putStr $ concatMap addColorProp $ zip str colors
   where
     addColorProp (ch, CA.White) = [ch]
     addColorProp (ch, col) = printf "<font class=\"%s\">%c</font>" (show col) ch
 
--- | This is only temporary, for testing,
--- until the web interface will be jsonized
-putChatMessageHtml :: Color -> String -> IO ()
-putChatMessageHtml col msg = putStr $ printf "##CHAT##%s##CHAT##" inner
-  where inner = printf "%s : %s" (show col) msg :: String
+putColoredStrJson :: String -> String -> IO ()
+putColoredStrJson msgType text = putStrLn $ printf "{ \
+  \ \"msgType\": \"%s\", \
+  \ \"text\": \"%s\" \
+  \ }" msgType text
+
+putChatMessageJson :: Color -> String -> IO ()
+putChatMessageJson col msg = putColoredStrJson "chat" inner
+ where inner = printf "%s : %s" (show col) msg :: String
 
 --- helper functions
 
@@ -197,8 +203,7 @@ sortPlayers = sortBy func
 colorLetter :: Color -> Char
 colorLetter = head . show
 
--- | Given a board render, attaches an IO action per character
--- that changes terminal color accordingly.
+-- | Given a board render, attaches a color per character
 addColor :: String -> (String, [CA.Color])
 addColor str = (str, map addColorChar str)
   where

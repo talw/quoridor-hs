@@ -5,6 +5,11 @@ body {
     background-color: #444;
 }
 
+p {
+    color: #cfc;
+    font-family: 'Inconsolata', monospace;
+}
+
 form {
     color: #cfc;
     font-family: 'Inconsolata', monospace;
@@ -20,6 +25,28 @@ form input {
     font-size: 16px;
     margin: 0px;
     padding: 0px;
+}
+
+#console {
+    display: block;
+    width: 60%;
+    height: 900px;
+    float: left;
+    overflow-y: auto;
+}
+
+#console-output {
+    overflow-y: auto;
+}
+
+#chat-output {
+    display: block;
+    float: left;
+    width: 30%;
+    min-width: 250px;
+    padding: 0px 0px 0px 30px;
+    height: 900px;
+    overflow-y: auto;
 }
 
 pre {

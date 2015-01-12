@@ -21,7 +21,7 @@ import           Quoridor.Cmdline.Network.Server (hostServer)
 import           Quoridor.Cmdline.Options        (ExecMode (..), Options (..),
                                                   getOptions)
 import           Quoridor.Cmdline.Parse          (parseTurn)
-import           Quoridor.Cmdline.Render         (putColoredStrTerm,
+import           Quoridor.Cmdline.Render         (putColoredBoardTerm,
                                                   runRenderColor)
 
 -- | The main entry point to quoridor-exec
@@ -79,7 +79,7 @@ renderCurrentBoard = do
 -- playClient(handleWinOrTurn, wonAction, renderBoard) and playServer(handleParse)
 -- if I change playClient and playServer to be in the same vein as playLocal
 renderBoard :: GameState -> GameConfig -> ValidMoves -> IO ()
-renderBoard gs gc vms = putColoredStrTerm $ runRenderColor gs gc vms
+renderBoard gs gc vms = putColoredBoardTerm $ runRenderColor gs gc vms
 
 handleParse :: MonadIO m =>
   m String -> (String -> m ()) -> (Turn -> m ()) -> m ()
