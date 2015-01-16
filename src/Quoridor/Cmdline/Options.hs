@@ -100,7 +100,7 @@ options =
 
   , Option "h" ["host"]
       (portOptionArg ExHost)
-      "Host a game server. default port 33997"
+      "Host a game server. default port 33996"
 
   , Option "j" ["join"]
       (portOptionArg ExJoin)
