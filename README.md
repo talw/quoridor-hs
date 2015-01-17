@@ -9,8 +9,14 @@ An implementation in Haskell of the 2-to-4-player strategy game.
 Here's a description of the game's rules:
 http://en.wikipedia.org/wiki/Quoridor#Rules_of_the_game
 
+## Screenshots
+### CLI
+![CLI](https://cloud.githubusercontent.com/assets/1179015/5788108/d2323c36-9e2c-11e4-8ac5-56bd07b28207.png)
+### Web browser interface
+![Browser interface](https://cloud.githubusercontent.com/assets/1179015/5788107/c949078a-9e2c-11e4-909a-91b28c44acf5.png)
+
 ## Usage
-Quoridor runs as a command-line application.
+quoridor-hs runs as a command-line application (quoridor-exec).
 
 ### Modes
 The executable can be run in one of the following modes:
@@ -57,12 +63,6 @@ Game board size will be 7x7 and number of players is 3.
 
 - Before you laugh at the 'command-line'y interface in the browser, let me defend my meager attempt by suggesting this was a learning exercise at general Haskell, not at client-side web development. As such, I wanted to maximize reuse of the CLI client, in the browser itself.
 As such, when connecting in the browser to the host, the host actually spawns a CLI client, connecting its stdout and stdin to the Websockets port that communicates with the client. And the client's js simply dumps whatit receives on screen.
-
-## Screenshots
-### CLI
-![CLI](https://cloud.githubusercontent.com/assets/1179015/5788108/d2323c36-9e2c-11e4-8ac5-56bd07b28207.png)
-### Web browser interface
-![Browser interface](https://cloud.githubusercontent.com/assets/1179015/5788107/c949078a-9e2c-11e4-909a-91b28c44acf5.png)
 
 ## Install
 
