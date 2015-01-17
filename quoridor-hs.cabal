@@ -1,5 +1,5 @@
 name:                quoridor-hs
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            A Quoridor implementation in Haskell
 homepage:            https://github.com/talw/quoridor-hs
 license:             BSD3
