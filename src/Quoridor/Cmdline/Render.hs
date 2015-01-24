@@ -66,7 +66,7 @@ runRender gs gc vms = D.toList w
 -- to set the terminal color. putColoredStr can be used to apply
 -- those actions automatically
 runRenderColor :: GameState -> GameConfig -> ValidMoves -> (String, [CA.Color])
-runRenderColor = ((addColor .) .) . runRender
+runRenderColor x y z = addColor $ runRender x y z
 
 -- | Given an input such as the output of runRenderColor, writes the
 -- game board along with some basic info, to the screen, applying

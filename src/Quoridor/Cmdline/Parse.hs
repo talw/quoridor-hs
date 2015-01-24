@@ -16,6 +16,7 @@ import           Text.Parsec                     (Parsec, anyChar, char, digit,
 import           Quoridor
 import           Quoridor.Cmdline.Messages       (validMovesChars)
 import           Quoridor.Cmdline.Network.Common (Message (TurnMsg, ChatMsg))
+import           Quoridor.Helpers
 
 type Parse = Parsec String ()
 
@@ -50,7 +51,7 @@ pShortCutMove = ShortCutMove . translate <$> oneOf validMovesChars
 pPutGate :: Parse Turn
 pPutGate = do
   char 'g'
-  PutGate <$> (gateUpperLeft <$> pCell <*> pDirection)
+  PutGate .: gateUpperLeft <$> pCell <*> pDirection
 
 pCell :: Parse Cell
 pCell = (,) <$> pInt <*> pInt

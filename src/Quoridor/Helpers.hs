@@ -15,4 +15,8 @@ rotateList [] = []
 rotateList (x:xs) = xs ++ [x]
 
 unsafeLookup :: Ord k => k -> M.Map k a -> a
-unsafeLookup = (fromJust .) . M.lookup
+unsafeLookup = fromJust .: M.lookup
+
+infixr 9 .:
+(.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+f .: g = \x y -> f $ g x y

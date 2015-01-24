@@ -14,7 +14,7 @@ import           Data.List            (find, sort)
 import qualified Data.Map             as M
 import qualified Data.Set             as S
 
-import           Quoridor.Helpers     (andP, rotateList, unsafeLookup)
+import           Quoridor.Helpers
 
 -- | A tile on the board.
 -- Direction of X and Y axis are right and down respectively.
@@ -146,7 +146,7 @@ distance :: Cell -> Cell -> Int
 distance (y,x) (y',x') = abs (y' - y) + abs (x' - x)
 
 isAdj :: Cell -> Cell -> Bool
-isAdj = ((1 ==) .) . distance
+isAdj = (1 ==) .: distance
 
 -- | Returns adjacent cells that are within the ranger of the board
 getAdj :: Int -> Cell -> [Cell]
@@ -166,7 +166,7 @@ align (c1,c2) = (min c1 c2, max c1 c2)
 -- | Equivalent to, given cells a and b (a,b)
 -- is the space between them open for movement?
 isHalfGateSpaceClear  :: HalfGate -> HalfGates -> Bool
-isHalfGateSpaceClear = (not .) . S.member . align
+isHalfGateSpaceClear = not .: S.member . align
 
 isGateSpaceClear  :: Gate -> HalfGates -> Bool
 isGateSpaceClear (h1, h2) =
