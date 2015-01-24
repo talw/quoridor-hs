@@ -9,7 +9,7 @@ import           Control.Monad.Reader (MonadReader, ReaderT, reader,
                                        runReaderT)
 import           Control.Monad.State  (MonadIO, MonadState, MonadTrans, StateT,
                                        evalState, get, gets, lift, modify, put,
-                                       runStateT, void)
+                                       runStateT, void, liftM3)
 import           Data.List            (find, sort)
 import qualified Data.Map             as M
 import qualified Data.Set             as S
@@ -207,11 +207,11 @@ isWinningCell bs p (cy,cx)
 -- that it is a shortcut of, using the integral index that
 -- is the index of the shortcut character in the list of
 -- 'validMovesChars'
-coerceTurn :: (Monad m, Functor m) => Turn -> Game m Turn
+coerceTurn :: (Monad m, Functor m) => Turn -> Game m (Maybe Turn)
 coerceTurn (ShortCutMove i) = do
   vmSorted <- sort <$> getCurrentValidMoves
-  return $ Move $ vmSorted !! i
-coerceTurn t = return t
+  return $ Move <$> vmSorted `safeAt` i
+coerceTurn t = return $ Just t
 
 -- | Gets a list of possible cells which
 -- the current player can move to.
@@ -314,19 +314,21 @@ checkAndSetWinner = do
 -- that the GameState did not change.
 makeTurn :: (Monad m, Functor m) => Turn -> Game m (Maybe Turn)
 makeTurn t = do
-  t' <- coerceTurn t
-  wasValid <- isValidTurn t'
-  if wasValid
-    then do actTurn t'
-            checkAndSetWinner
-            changeCurrPlayer
-            return $ Just t'
-    else return Nothing
+  mt <- coerceTurn t
+  case mt of
+    Nothing -> return Nothing
+    Just t' -> do
+      wasValid <- isValidTurn t'
+      if wasValid
+        then do actTurn t'
+                checkAndSetWinner
+                changeCurrPlayer
+                return $ Just t'
+        else return Nothing
 
 -- | A Game monad wrapper for the unmonadic 'getValidMoves'
-getCurrentValidMoves :: Monad m => Game m [Cell]
-getCurrentValidMoves = do
-  bs <- reader boardSize
-  gs <- get
-  let cell = pos $ currP gs
-  return $ getValidMoves cell bs gs
+getCurrentValidMoves :: (Monad m, Functor m) => Game m [Cell]
+getCurrentValidMoves = liftM3 getValidMoves posCurrP
+                                            (reader boardSize)
+                                            get
+ where posCurrP = gets $ pos . currP

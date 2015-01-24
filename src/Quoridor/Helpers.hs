@@ -20,3 +20,11 @@ unsafeLookup = fromJust .: M.lookup
 infixr 9 .:
 (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 f .: g = \x y -> f $ g x y
+
+safeAt :: [a] -> Int -> Maybe a
+safeAt list targetInd = go list targetInd 0
+ where
+  go [] _ _ = Nothing
+  go (x:xs) i n
+    | i == n = Just x
+    | otherwise = go xs i (n+1)
