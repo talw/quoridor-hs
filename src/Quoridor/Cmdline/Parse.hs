@@ -3,7 +3,7 @@ module Quoridor.Cmdline.Parse
     parseMessage
   ) where
 
-import           Control.Applicative             (pure)
+import           Control.Applicative             (pure, (<*), (<*>), (*>))
 import           Data.Char                       (toUpper)
 import           Data.Functor                    ((<$>))
 import           Data.List                       (elemIndex)
@@ -32,10 +32,7 @@ pChat = do
   asToken $ manyTill anyChar eof
 
 pTurn :: Parse Turn
-pTurn = do
-  res <- pMove <|> pShortCutMove <|> pPutGate
-  eof
-  return res
+pTurn = (pMove <|> pShortCutMove <|> pPutGate) <* eof
 
 -- m y x
 pMove :: Parse Turn
@@ -46,23 +43,17 @@ pMove = do
 -- one of 'validMovesChars', translated
 -- into their index.
 pShortCutMove :: Parse Turn
-pShortCutMove = do
-    c <- oneOf validMovesChars
-    return $ ShortCutMove $ translate c
-  where translate c = fromJust $ elemIndex c validMovesChars
+pShortCutMove = ShortCutMove . translate <$> oneOf validMovesChars
+ where translate c = fromJust $ elemIndex c validMovesChars
 
 -- g y x h|v
 pPutGate :: Parse Turn
 pPutGate = do
   char 'g'
-  c <- pCell
-  PutGate . gateUpperLeft c <$> pDirection
+  PutGate <$> (gateUpperLeft <$> pCell <*> pDirection)
 
 pCell :: Parse Cell
-pCell = do
-  y <- pInt
-  x <- pInt
-  return (y,x)
+pCell = (,) <$> pInt <*> pInt
 
 pDirection :: Parse Direction
 pDirection = cToDirection <$> asToken (oneOf "hv")
@@ -72,7 +63,7 @@ pInt :: Parse Int
 pInt = (read :: String -> Int) <$> asToken (many1 digit)
 
 asToken :: Parse a -> Parse a
-asToken p = spaces >> p
+asToken p = spaces *> p
 
 parseShowErrMsgs :: Parse a -> String -> Either String a
 parseShowErrMsgs p str = func $ parse p "" str
